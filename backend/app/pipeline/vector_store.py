@@ -10,10 +10,13 @@ import threading
 import time
 from pathlib import Path
 
-import faiss
 import numpy as np
 
+from app.compat import install_numpy_distutils_stub
 from app.logging_setup import get_logger
+
+install_numpy_distutils_stub()  # required before importing faiss on Py3.12/aarch64
+import faiss  # noqa: E402
 
 logger = get_logger("pipeline.vector_store")
 
