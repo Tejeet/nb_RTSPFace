@@ -29,6 +29,7 @@ from app.pipeline.live import LiveFrameBuffer
 from app.pipeline.quality import QualityEvaluator
 from app.pipeline.stats import StatsCollector
 from app.pipeline.tracker import ByteTracker
+from app.pipeline.zone import CaptureZone
 
 logger = get_logger("pipeline.workers")
 
@@ -71,6 +72,7 @@ class DetectionWorker(threading.Thread):
         live_buffer: LiveFrameBuffer,
         stats: StatsCollector,
         camera_fps: "callable",
+        zone: CaptureZone,
     ) -> None:
         super().__init__(name="detection-worker", daemon=True)
         self._settings = settings
@@ -83,6 +85,7 @@ class DetectionWorker(threading.Thread):
         self._live = live_buffer
         self._stats = stats
         self._camera_fps = camera_fps
+        self._zone = zone
         self._stop_event = threading.Event()
 
     def stop(self) -> None:
@@ -125,12 +128,18 @@ class DetectionWorker(threading.Thread):
         self._stats.record_detection(latency_ms, len(tracks), self._tracker.tracked_count)
 
         now = time.time()
+        frame_h, frame_w = packet.frame.shape[:2]
         for track in tracks:
             due = (
                 track.last_saved_at == 0.0
                 or now - track.last_saved_at >= self._settings.save_interval_seconds
             )
             if not due:
+                continue
+
+            # Zone gate: capture only inside the configured area. The save timer
+            # is untouched, so a track entering the zone later is captured then.
+            if not self._zone.contains_bbox(track.bbox, frame_w, frame_h):
                 continue
 
             face_crop = self._cropper.crop(packet.frame, track.bbox)

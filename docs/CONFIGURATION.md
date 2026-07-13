@@ -35,6 +35,7 @@ startup by `app/config.py`. Nothing is hardcoded.
 
 | Variable | Default | Description |
 | --- | --- | --- |
+| `CAPTURE_ZONE` | *(empty)* | Optional polygon restricting where faces are captured: `x1,y1;x2,y2;…` in normalized 0–1 coordinates (origin top-left), ≥3 points. Empty = whole frame. Detection/tracking still run frame-wide; the zone is drawn on the live view and out-of-zone faces show grey boxes |
 | `SAVE_INTERVAL_SECONDS` | `10` | Min seconds between saves of the same track |
 | `FACE_CROP_PADDING` | `0.20` | Context padding around the box (fraction; 0.15–0.25 typical) |
 | `FACE_CROP_SIZE` | `224` | Saved image size (160 or 224 recommended) |

@@ -23,6 +23,7 @@ from app.pipeline.stats import StatsCollector
 from app.pipeline.tracker import ByteTracker
 from app.pipeline.vector_store import VectorStore
 from app.pipeline.workers import CaptureJob, DetectionWorker, EmbeddingWorker, PersistJob, StorageWorker
+from app.pipeline.zone import CaptureZone
 
 logger = get_logger("pipeline.orchestrator")
 
@@ -87,9 +88,14 @@ class Pipeline:
             output_size=settings.face_crop_size,
             jpeg_quality=settings.jpeg_quality,
         )
+        self.capture_zone = CaptureZone(CaptureZone.parse(settings.capture_zone))
+        if self.capture_zone.enabled:
+            logger.info("Capture zone active: %s", settings.capture_zone)
+
         self.live_buffer = LiveFrameBuffer(
             target_width=settings.live_stream_width,
             max_fps=settings.live_stream_fps,
+            zone=self.capture_zone,
         )
 
         # Workers
@@ -111,6 +117,7 @@ class Pipeline:
             live_buffer=self.live_buffer,
             stats=self.stats,
             camera_fps=lambda: self.camera.state.fps,
+            zone=self.capture_zone,
         )
         self.embedding_worker = EmbeddingWorker(
             embed_queue=self.embed_queue,

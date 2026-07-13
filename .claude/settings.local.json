@@ -3,7 +3,8 @@
     "allow": [
       "Bash(stubtest/bin/pip install *)",
       "Bash(stubtest/bin/python test_stub.py)",
-      "Bash(python3 -m compileall -q backend/app)"
+      "Bash(python3 -m compileall -q backend/app)",
+      "Bash(stubtest/bin/python test_zone.py)"
     ]
   }
 }

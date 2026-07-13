@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     track_low_score_threshold: float = Field(default=0.30, alias="TRACK_LOW_SCORE_THRESHOLD")
 
     # -- Capture / saving ----------------------------------------------
+    # Optional polygon (normalized "x1,y1;x2,y2;…", ≥3 points) restricting WHERE
+    # faces are captured. Empty = whole frame. Detection/tracking are unaffected.
+    capture_zone: str = Field(default="", alias="CAPTURE_ZONE")
     save_interval_seconds: float = Field(default=10.0, gt=0, alias="SAVE_INTERVAL_SECONDS")
     face_crop_padding: float = Field(default=0.20, ge=0.0, le=1.0, alias="FACE_CROP_PADDING")
     face_crop_size: int = Field(default=224, alias="FACE_CROP_SIZE")
