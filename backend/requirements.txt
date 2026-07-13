@@ -16,8 +16,11 @@ numpy==1.26.4
 opencv-python-headless==4.10.0.84
 onnxruntime==1.20.1
 insightface==0.7.3
-faiss-cpu==1.9.0.post1
+faiss-cpu==1.10.0
 scipy==1.14.1
+# faiss's aarch64 loader imports numpy.distutils, which needs the setuptools
+# distutils shim on Python 3.12 (stdlib distutils was removed).
+setuptools==75.6.0
 
 # System metrics
 psutil==6.1.0
