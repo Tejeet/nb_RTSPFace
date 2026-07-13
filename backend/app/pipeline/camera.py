@@ -5,6 +5,7 @@ and pushes frames into a bounded queue using drop-oldest semantics so the
 capture rate is never blocked by slow downstream stages.
 """
 
+import os
 import queue
 import threading
 import time
@@ -65,12 +66,14 @@ class CameraReader(threading.Thread):
         frame_queue: "queue.Queue[FramePacket]",
         reconnect_min_delay: float,
         reconnect_max_delay: float,
+        rtsp_transport: str = "tcp",
     ) -> None:
         super().__init__(name="camera-reader", daemon=True)
         self._rtsp_url = rtsp_url
         self._queue = frame_queue
         self._min_delay = reconnect_min_delay
         self._max_delay = reconnect_max_delay
+        self._rtsp_transport = rtsp_transport
         self._stop_event = threading.Event()
         self.state = CameraState()
 
@@ -82,6 +85,12 @@ class CameraReader(threading.Thread):
 
     def _open(self) -> cv2.VideoCapture | None:
         """Try to open the RTSP stream once."""
+        # OpenCV's FFmpeg backend only accepts demuxer options via this env var,
+        # read at VideoCapture creation time. RTP-over-TCP is essential inside
+        # Docker bridge networks where UDP return traffic is unroutable.
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
+            f"rtsp_transport;{self._rtsp_transport}|max_delay;500000"
+        )
         capture = cv2.VideoCapture(self._rtsp_url, cv2.CAP_FFMPEG)
         capture.set(cv2.CAP_PROP_BUFFERSIZE, 2)
         if not capture.isOpened():

@@ -87,7 +87,8 @@ curl -s http://localhost:8000/api/health | python3 -m json.tool
 
 | Symptom | Check |
 | --- | --- |
-| Camera offline in dashboard | `docker exec efc-backend python -c "import cv2; print(cv2.VideoCapture('<RTSP_URL>').isOpened())"`; verify the URL-encoded password (`@` → `%40`) and that the Pi can reach the camera IP |
+| Camera offline but stream plays in VLC | Ensure `RTSP_TRANSPORT=tcp` (default). VLC silently falls back to TCP; OpenCV defaults to UDP, whose return packets can't reach a bridge-networked container |
+| Camera offline in dashboard | Check `docker logs efc-backend` for "Camera connection failed"; verify the URL-encoded password (`@` → `%40`) and that the container can reach the camera: `docker exec efc-backend python -c "import socket; socket.create_connection(('192.168.6.61', 554), 5); print('reachable')"` |
 | Slow / low FPS | Lower `DETECTION_SIZE` to 480, raise `DETECT_EVERY_N_FRAMES`; check `temperature_c` for thermal throttling (add a heatsink/fan above ~80 °C) |
 | High RAM | Confirm queue sizes are default; RAM should plateau ~1.5–2 GB with models loaded |
 | First start very slow | Model download in progress — see backend logs |

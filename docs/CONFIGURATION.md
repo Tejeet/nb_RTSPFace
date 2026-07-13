@@ -8,6 +8,7 @@ startup by `app/config.py`. Nothing is hardcoded.
 | Variable | Default | Description |
 | --- | --- | --- |
 | `RTSP_URL` | — (required) | Full RTSP URL. URL-encode special characters in credentials (`@` → `%40`) |
+| `RTSP_TRANSPORT` | `tcp` | RTP transport. Keep `tcp` in Docker: UDP return traffic cannot reach a bridge-networked container (streams that play in VLC fail with `udp`) |
 | `CAMERA_NAME` | `camera-1` | Display name; also the camera row key in the DB |
 | `CAMERA_RECONNECT_MIN_DELAY` | `1.0` | First retry delay (s); doubles each failure |
 | `CAMERA_RECONNECT_MAX_DELAY` | `30.0` | Retry delay ceiling (s); retries forever |

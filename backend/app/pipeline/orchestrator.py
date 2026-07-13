@@ -98,6 +98,7 @@ class Pipeline:
             frame_queue=self.frame_queue,
             reconnect_min_delay=settings.camera_reconnect_min_delay,
             reconnect_max_delay=settings.camera_reconnect_max_delay,
+            rtsp_transport=settings.rtsp_transport,
         )
         self.detection_worker = DetectionWorker(
             settings=settings,

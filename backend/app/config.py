@@ -19,6 +19,9 @@ class Settings(BaseSettings):
 
     # -- Camera --------------------------------------------------------
     rtsp_url: str = Field(alias="RTSP_URL")
+    # TCP is required in Docker bridge networks: UDP/RTP return traffic cannot
+    # reach the container, which makes streams that play fine in VLC fail here.
+    rtsp_transport: str = Field(default="tcp", alias="RTSP_TRANSPORT")
     camera_name: str = Field(default="camera-1", alias="CAMERA_NAME")
     camera_reconnect_min_delay: float = Field(default=1.0, alias="CAMERA_RECONNECT_MIN_DELAY")
     camera_reconnect_max_delay: float = Field(default=30.0, alias="CAMERA_RECONNECT_MAX_DELAY")
