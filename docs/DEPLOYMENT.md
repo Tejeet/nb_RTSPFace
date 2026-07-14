@@ -118,6 +118,11 @@ Setup on the A7Z:
 3. Rebuild (`docker compose up -d --build backend`), open **Dashboard → Settings**,
    select **NPU**, save, and restart the backend.
 
+To also see **NPU utilization** on the Statistics page, uncomment the
+`/sys/kernel/debug` volume line in `docker-compose.yml` (the load node lives in
+debugfs on most boards; the tile appears automatically when a reading is available
+and stays hidden on boards without an NPU, like the Pi CM5).
+
 The Settings page shows whether an NPU runtime was detected and which providers are
 actually active. Selecting NPU without the runtime is safe — the app logs a warning
 and runs on CPU, so the same image and configuration work across the Pi CM5 (CPU)

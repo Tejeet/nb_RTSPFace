@@ -6,7 +6,9 @@ bus on a fixed interval. The same snapshot backs /api/statistics and
 /api/health.
 """
 
+import re
 import threading
+from glob import glob
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +19,39 @@ from app.logging_setup import get_logger
 logger = get_logger("pipeline.health")
 
 THERMAL_ZONE = Path("/sys/class/thermal/thermal_zone0/temp")
+
+# NPU load nodes by vendor. Requires /sys/kernel/debug bind-mounted into the
+# container for the debugfs ones (see docker-compose.yml comments).
+#   rknpu/load : Rockchip   → "NPU load:  Core0: 12%, Core1: 3%,"
+#   gc/load    : VeriSilicon galcore (Allwinner A733 / Radxa Cubie A7Z)
+#   devfreq    : generic    → "12@600000000" (load@frequency)
+_NPU_LOAD_GLOBS: tuple[str, ...] = (
+    "/sys/kernel/debug/rknpu/load",
+    "/sys/kernel/debug/gc/load",
+    "/sys/kernel/debug/gc/idle",
+    "/sys/class/devfreq/*npu*/load",
+)
+
+
+def read_npu_usage() -> float | None:
+    """NPU utilization percent, or None when the board exposes no load node."""
+    for pattern in _NPU_LOAD_GLOBS:
+        for path_str in sorted(glob(pattern)):
+            try:
+                text = Path(path_str).read_text().strip()
+            except (OSError, PermissionError):
+                continue
+            percents = [float(p) for p in re.findall(r"(\d+(?:\.\d+)?)\s*%", text)]
+            if percents:
+                value = sum(percents) / len(percents)
+                # gc/idle reports idle time; invert it to get load.
+                if path_str.endswith("/idle"):
+                    value = 100.0 - value
+                return round(min(100.0, max(0.0, value)), 1)
+            match = re.match(r"^(\d+)@\d+", text)  # devfreq "load@freq"
+            if match:
+                return round(min(100.0, float(match.group(1))), 1)
+    return None
 
 
 def read_temperature_c() -> float | None:
@@ -57,6 +92,7 @@ class HealthMonitor(threading.Thread):
             "disk_percent": disk.percent,
             "disk_free_gb": round(disk.free / (1024**3), 2),
             "temperature_c": read_temperature_c(),
+            "npu_percent": read_npu_usage(),
         }
 
     def run(self) -> None:

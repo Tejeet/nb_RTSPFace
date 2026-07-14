@@ -112,6 +112,7 @@ class SystemStats(BaseModel):
     disk_percent: float
     disk_free_gb: float
     temperature_c: float | None
+    npu_percent: float | None = None  # only on boards exposing an NPU load node
     uptime_seconds: float
     queues: QueueSizes
 

@@ -65,6 +65,14 @@ export default function StatsPage() {
           unit="°C"
           tone={tone(stats.temperature_c ?? 0, 70, 80)}
         />
+        {stats.npu_percent != null && (
+          <StatCard
+            label="NPU"
+            value={stats.npu_percent.toFixed(0)}
+            unit="%"
+            tone="accent"
+          />
+        )}
         <StatCard label="Uptime" value={formatUptime(stats.uptime_seconds)} />
       </div>
     </div>
