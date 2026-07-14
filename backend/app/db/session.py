@@ -4,10 +4,17 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.models import Base
+
+# Columns added after the initial release: (table, column, DDL type).
+# create_all() only creates missing tables, so existing databases get these
+# via lightweight ALTERs at startup (idempotent).
+_SCHEMA_ADDITIONS: tuple[tuple[str, str, str], ...] = (
+    ("faces", "frame_path", "TEXT"),
+)
 
 
 def create_db_engine(sqlite_path: Path) -> Engine:
@@ -38,8 +45,16 @@ class DatabaseManager:
         self._session_factory = sessionmaker(bind=self._engine, expire_on_commit=False)
 
     def create_schema(self) -> None:
-        """Create all tables if they do not exist."""
+        """Create all tables if they do not exist and apply column additions."""
         Base.metadata.create_all(self._engine)
+        with self._engine.connect() as conn:
+            for table, column, ddl_type in _SCHEMA_ADDITIONS:
+                existing = {
+                    row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))
+                }
+                if column not in existing:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl_type}"))
+                    conn.commit()
 
     @contextmanager
     def session(self) -> Iterator[Session]:

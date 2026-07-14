@@ -45,8 +45,13 @@ export default function FaceDetailPage() {
         <h1>Face #{face.id}</h1>
         <div className="header-actions">
           <a className="button" href={face.image_url} download={`face_${face.uuid}.jpg`}>
-            ⬇ Download image
+            ⬇ Face image
           </a>
+          {face.frame_url && (
+            <a className="button" href={face.frame_url} download={`frame_${face.uuid}.jpg`}>
+              ⬇ Full frame
+            </a>
+          )}
           <button className="button button-danger" onClick={handleDelete}>
             Delete
           </button>
@@ -72,6 +77,15 @@ export default function FaceDetailPage() {
               ))}
             </tbody>
           </table>
+
+          {face.frame_url && (
+            <>
+              <h2 className="section-title">Full frame at capture</h2>
+              <a href={face.frame_url} target="_blank" rel="noreferrer">
+                <img src={face.frame_url} alt="Full frame" className="full-frame-preview" />
+              </a>
+            </>
+          )}
 
           <h2 className="section-title">Similarity matches</h2>
           {face.duplicates.length === 0 && (

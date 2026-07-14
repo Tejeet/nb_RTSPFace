@@ -6,6 +6,7 @@ Designed so additional cameras become additional CameraReader +
 DetectionWorker pairs feeding the same embedding/storage stages.
 """
 
+import json
 import queue
 
 from app.config import Settings
@@ -14,7 +15,7 @@ from app.db.session import DatabaseManager
 from app.logging_setup import get_logger
 from app.pipeline.camera import CameraReader, FramePacket
 from app.pipeline.cropper import FaceCropper
-from app.pipeline.detector import FaceModels
+from app.pipeline.detector import FaceModels, npu_runtime_available, resolve_providers
 from app.pipeline.events import EventBus
 from app.pipeline.health import HealthMonitor
 from app.pipeline.live import LiveFrameBuffer
@@ -24,6 +25,7 @@ from app.pipeline.tracker import ByteTracker
 from app.pipeline.vector_store import VectorStore
 from app.pipeline.workers import CaptureJob, DetectionWorker, EmbeddingWorker, PersistJob, StorageWorker
 from app.pipeline.zone import CaptureZone
+from app.runtime_settings import RuntimeSettings
 
 logger = get_logger("pipeline.orchestrator")
 
@@ -44,6 +46,13 @@ class Pipeline:
         self.event_bus = EventBus()
         self.stats = StatsCollector()
 
+        # Inference backend: dashboard-saved value overrides the env default.
+        self.runtime_settings = RuntimeSettings(settings.database_dir / "settings.json")
+        self.inference_backend = str(
+            self.runtime_settings.get("inference_backend", settings.inference_backend)
+        )
+        providers, self.npu_active = resolve_providers(self.inference_backend)
+
         # Models (loaded once; shared by detection worker and search API)
         self.models = FaceModels(
             model_pack=settings.embedding_model,
@@ -51,6 +60,7 @@ class Pipeline:
             detection_size=settings.detection_size,
             detection_confidence=settings.detection_confidence,
             min_face_size=settings.min_face_size,
+            providers=providers,
         )
 
         self.vector_store = VectorStore(
@@ -84,13 +94,15 @@ class Pipeline:
         self.cropper = FaceCropper(
             faces_dir=settings.faces_dir,
             thumbnails_dir=settings.thumbnails_dir,
+            frames_dir=settings.frames_dir,
             padding=settings.face_crop_padding,
             output_size=settings.face_crop_size,
             jpeg_quality=settings.jpeg_quality,
         )
-        self.capture_zone = CaptureZone(CaptureZone.parse(settings.capture_zone))
+        # Zone precedence: dashboard-saved zone.json overrides the env default.
+        self.capture_zone = CaptureZone(self._load_zone_points())
         if self.capture_zone.enabled:
-            logger.info("Capture zone active: %s", settings.capture_zone)
+            logger.info("Capture zone active: %s", self.capture_zone.get_points())
 
         self.live_buffer = LiveFrameBuffer(
             target_width=settings.live_stream_width,
@@ -168,6 +180,55 @@ class Pipeline:
         self.vector_store.save()
         self.db.dispose()
         logger.info("Pipeline stopped")
+
+    # -- inference settings ------------------------------------------------------
+
+    def inference_info(self) -> dict[str, object]:
+        """Current + requested inference backend state for the Settings page."""
+        requested = str(
+            self.runtime_settings.get("inference_backend", self.settings.inference_backend)
+        )
+        return {
+            "inference_backend": requested,
+            "running_backend": self.inference_backend,
+            "npu_active": self.npu_active,
+            "npu_runtime_available": npu_runtime_available(),
+            "active_providers": self.models.active_providers,
+            "requires_restart": requested != self.inference_backend,
+            "model_pack": self.settings.embedding_model,
+            "detection_size": self.settings.detection_size,
+        }
+
+    def set_inference_backend(self, backend: str) -> None:
+        """Persist the backend choice; applied on the next backend restart."""
+        if backend not in ("cpu", "npu"):
+            raise ValueError("inference_backend must be 'cpu' or 'npu'")
+        self.runtime_settings.set("inference_backend", backend)
+
+    # -- capture zone ----------------------------------------------------------
+
+    @property
+    def _zone_file(self):  # noqa: ANN202 (Path; kept terse)
+        return self.settings.database_dir / "zone.json"
+
+    def _load_zone_points(self) -> list[tuple[float, float]]:
+        """Dashboard-saved zone if present, otherwise the CAPTURE_ZONE env value."""
+        if self._zone_file.exists():
+            try:
+                data = json.loads(self._zone_file.read_text())
+                return CaptureZone.validate_points(
+                    [(float(p[0]), float(p[1])) for p in data.get("points", [])]
+                )
+            except (ValueError, KeyError, IndexError, json.JSONDecodeError):
+                logger.exception("Invalid zone.json; falling back to CAPTURE_ZONE env")
+        return CaptureZone.parse(self.settings.capture_zone)
+
+    def set_capture_zone(self, points: list[tuple[float, float]]) -> None:
+        """Apply and persist a new capture zone (empty list disables it)."""
+        validated = CaptureZone.validate_points(points)
+        self.capture_zone.set_points(validated)
+        self._zone_file.write_text(json.dumps({"points": validated}))
+        logger.info("Capture zone updated: %d points", len(validated))
 
     # -- read views for the API -----------------------------------------------
 

@@ -35,7 +35,8 @@ startup by `app/config.py`. Nothing is hardcoded.
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `CAPTURE_ZONE` | *(empty)* | Optional polygon restricting where faces are captured: `x1,y1;x2,y2;…` in normalized 0–1 coordinates (origin top-left), ≥3 points. Empty = whole frame. Detection/tracking still run frame-wide; the zone is drawn on the live view and out-of-zone faces show grey boxes |
+| `CAPTURE_ZONE` | *(empty)* | Optional polygon restricting where faces are captured: `x1,y1;x2,y2;…` in normalized 0–1 coordinates (origin top-left), ≥3 points. Empty = whole frame. Detection/tracking still run frame-wide; the zone is drawn on the live view and out-of-zone faces show grey boxes. A zone drawn in the dashboard (persisted as `database/zone.json`) overrides this value |
+| `SAVE_FULL_FRAME` | `true` | Also store the full camera frame per capture under `frames/` (~200–500 KB each; disable to save disk) |
 | `SAVE_INTERVAL_SECONDS` | `10` | Min seconds between saves of the same track |
 | `FACE_CROP_PADDING` | `0.20` | Context padding around the box (fraction; 0.15–0.25 typical) |
 | `FACE_CROP_SIZE` | `224` | Saved image size (160 or 224 recommended) |
@@ -43,6 +44,12 @@ startup by `app/config.py`. Nothing is hardcoded.
 | `QUALITY_MIN_SCORE` | `0.45` | Composite score floor for acceptance |
 | `QUALITY_BLUR_THRESHOLD` | `45.0` | Variance-of-Laplacian floor (higher = stricter) |
 | `QUALITY_BRIGHTNESS_MIN/MAX` | `40` / `215` | Mean-gray acceptance band |
+
+## Inference hardware
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `INFERENCE_BACKEND` | `cpu` | `cpu` or `npu`. NPU selects an ONNX Runtime NPU execution provider (VSINPU on Radxa Cubie A7Z, RKNPU on Rockchip) when the container's onnxruntime build ships one; otherwise it falls back to CPU with a logged warning. The dashboard Settings page can override this (persisted as `database/settings.json` in the volume); changes apply on backend restart |
 
 ## Embeddings & search
 

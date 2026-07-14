@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 from app.config import Settings
@@ -40,13 +41,14 @@ _SENTINEL = None
 class CaptureJob:
     """A quality-approved face crop awaiting embedding."""
 
-    face_crop: np.ndarray  # padded crop (for saving)
+    face_crop: np.ndarray  # padded square crop (for saving)
     aligned: np.ndarray  # 112x112 aligned crop (for embedding)
     bbox: tuple[int, int, int, int]
     track_id: int
     detection_confidence: float
     quality_score: float
     captured_at: datetime
+    frame_jpeg: bytes | None = None  # full frame, pre-encoded (SAVE_FULL_FRAME)
 
 
 @dataclass
@@ -129,6 +131,7 @@ class DetectionWorker(threading.Thread):
 
         now = time.time()
         frame_h, frame_w = packet.frame.shape[:2]
+        frame_jpeg: bytes | None = None  # encoded lazily, shared by captures this frame
         for track in tracks:
             due = (
                 track.last_saved_at == 0.0
@@ -150,6 +153,12 @@ class DetectionWorker(threading.Thread):
                 continue  # retry on a later frame
 
             track.last_saved_at = now
+            if self._settings.save_full_frame and frame_jpeg is None:
+                ok, encoded = cv2.imencode(
+                    ".jpg", packet.frame,
+                    [int(cv2.IMWRITE_JPEG_QUALITY), self._settings.jpeg_quality],
+                )
+                frame_jpeg = encoded.tobytes() if ok else None
             job = CaptureJob(
                 face_crop=face_crop.copy(),
                 aligned=self._models.align(packet.frame, track.kps),
@@ -158,6 +167,7 @@ class DetectionWorker(threading.Thread):
                 detection_confidence=track.score,
                 quality_score=result.score,
                 captured_at=datetime.now(UTC),
+                frame_jpeg=frame_jpeg,
             )
             try:
                 self._embed_queue.put_nowait(job)
@@ -253,6 +263,12 @@ class StorageWorker(threading.Thread):
 
         saved = self._cropper.save(capture.face_crop, capture.captured_at)
 
+        frame_path: Path | None = None
+        if capture.frame_jpeg is not None:
+            frame_path = self._cropper.save_frame_jpeg(
+                capture.frame_jpeg, saved.face_uuid, capture.captured_at
+            )
+
         embedding_path = self._embedding_path(saved.face_uuid, capture.captured_at)
         embedding_path.parent.mkdir(parents=True, exist_ok=True)
         np.save(embedding_path, job.embedding)
@@ -274,6 +290,7 @@ class StorageWorker(threading.Thread):
                 image_path=str(saved.image_path),
                 thumbnail_path=str(saved.thumbnail_path),
                 embedding_path=str(embedding_path),
+                frame_path=str(frame_path) if frame_path else None,
                 detection_confidence=round(capture.detection_confidence, 4),
                 quality_score=capture.quality_score,
                 bbox_x=x, bbox_y=y, bbox_w=w, bbox_h=h,

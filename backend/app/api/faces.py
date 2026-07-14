@@ -78,6 +78,7 @@ def get_face(face_id: int, pipeline: Pipeline = Depends(get_pipeline)) -> FaceDe
         file_size_bytes=face.file_size_bytes,
         embedding_model=face.embedding_model,
         embedding_path=face.embedding_path,
+        frame_url=f"/api/faces/{face.id}/frame" if face.frame_path else None,
         camera_name=pipeline.settings.camera_name,
         duplicates=duplicates,
     )
@@ -95,6 +96,17 @@ def get_face_thumbnail(face_id: int, pipeline: Pipeline = Depends(get_pipeline))
     return _serve_image(pipeline, face_id, thumbnail=True)
 
 
+@router.get("/faces/{face_id}/frame")
+def get_face_frame(face_id: int, pipeline: Pipeline = Depends(get_pipeline)) -> FileResponse:
+    """The full camera frame stored at the moment of capture."""
+    face = pipeline.repository.get_face(face_id)
+    if face is None:
+        raise HTTPException(status_code=404, detail="Face not found")
+    if not face.frame_path or not Path(face.frame_path).exists():
+        raise HTTPException(status_code=404, detail="Full frame not stored for this face")
+    return FileResponse(face.frame_path, media_type="image/jpeg")
+
+
 @router.delete("/faces/{face_id}", response_model=MessageResponse)
 def delete_face(face_id: int, pipeline: Pipeline = Depends(get_pipeline)) -> MessageResponse:
     """Delete a face: database row, FAISS vector, and files on disk."""
@@ -103,7 +115,7 @@ def delete_face(face_id: int, pipeline: Pipeline = Depends(get_pipeline)) -> Mes
         raise HTTPException(status_code=404, detail="Face not found")
 
     pipeline.vector_store.remove(face_id)
-    for path_str in (face.image_path, face.thumbnail_path, face.embedding_path):
+    for path_str in (face.image_path, face.thumbnail_path, face.embedding_path, face.frame_path):
         if path_str:
             Path(path_str).unlink(missing_ok=True)
     logger.info("Face deleted: id=%d uuid=%s", face_id, face.uuid)

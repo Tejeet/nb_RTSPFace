@@ -12,12 +12,43 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
+import onnxruntime as ort
 from insightface.app import FaceAnalysis
 from insightface.utils import face_align
 
 from app.logging_setup import get_logger
 
 logger = get_logger("pipeline.detector")
+
+# ONNX Runtime NPU execution providers, in preference order.
+# VSINPU = VeriSilicon (Allwinner A733 → Radxa Cubie A7Z, ~3 TOPS);
+# RKNPU  = Rockchip (RK3588 family). Present only in vendor/custom ORT builds.
+NPU_PROVIDERS: tuple[str, ...] = ("VSINPUExecutionProvider", "RKNPUExecutionProvider")
+
+
+def resolve_providers(backend: str) -> tuple[list[str], bool]:
+    """Map a backend name ("cpu" | "npu") to ONNX Runtime providers.
+
+    Returns (providers, npu_active). "npu" falls back to CPU-only with a
+    warning when no NPU execution provider is installed, so the same image
+    runs unchanged on hardware without an NPU runtime.
+    """
+    available = ort.get_available_providers()
+    if backend == "npu":
+        npu = [p for p in NPU_PROVIDERS if p in available]
+        if npu:
+            logger.info("NPU execution provider active: %s", npu[0])
+            return [*npu, "CPUExecutionProvider"], True
+        logger.warning(
+            "INFERENCE_BACKEND=npu but no NPU execution provider is installed "
+            "(available: %s); falling back to CPU", available,
+        )
+    return ["CPUExecutionProvider"], False
+
+
+def npu_runtime_available() -> bool:
+    """True when this onnxruntime build ships an NPU execution provider."""
+    return any(p in ort.get_available_providers() for p in NPU_PROVIDERS)
 
 
 @dataclass
@@ -39,17 +70,20 @@ class FaceModels:
         detection_size: int,
         detection_confidence: float,
         min_face_size: int,
+        providers: list[str] | None = None,
     ) -> None:
         self._detection_confidence = detection_confidence
         self._min_face_size = min_face_size
         self.model_pack = model_pack
+        providers = providers or ["CPUExecutionProvider"]
 
-        logger.info("Loading InsightFace model pack '%s' (CPU)", model_pack)
+        logger.info("Loading InsightFace model pack '%s' (providers=%s)",
+                    model_pack, providers)
         self._analysis = FaceAnalysis(
             name=model_pack,
             root=str(models_dir),
             allowed_modules=["detection", "recognition"],
-            providers=["CPUExecutionProvider"],
+            providers=providers,
         )
         self._analysis.prepare(
             ctx_id=-1,
@@ -113,3 +147,11 @@ class FaceModels:
     def embedding_dim(self) -> int:
         """Dimensionality of the recognition embedding (512 for buffalo_l)."""
         return 512
+
+    @property
+    def active_providers(self) -> list[str]:
+        """Execution providers actually bound to the ONNX sessions."""
+        session = getattr(self._recognizer, "session", None)
+        if session is not None:
+            return list(session.get_providers())
+        return []

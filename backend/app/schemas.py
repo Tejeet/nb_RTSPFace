@@ -40,6 +40,7 @@ class FaceDetail(FaceSummary):
     file_size_bytes: int
     embedding_model: str | None
     embedding_path: str | None
+    frame_url: str | None
     camera_name: str
     duplicates: list["DuplicateMatch"]
 
@@ -131,6 +132,32 @@ class HealthStatus(BaseModel):
     disk_percent: float
     temperature_c: float | None
     uptime_seconds: float
+
+
+class InferenceInfo(BaseModel):
+    """Inference backend state shown on the Settings page."""
+
+    inference_backend: str  # requested/persisted: "cpu" | "npu"
+    running_backend: str  # what the current process started with
+    npu_active: bool
+    npu_runtime_available: bool
+    active_providers: list[str]
+    requires_restart: bool
+    model_pack: str
+    detection_size: int
+
+
+class InferenceUpdate(BaseModel):
+    """Settings page payload."""
+
+    inference_backend: str
+
+
+class ZoneConfig(BaseModel):
+    """Capture zone polygon in normalized (0..1) coordinates."""
+
+    points: list[tuple[float, float]]
+    enabled: bool = False
 
 
 class MessageResponse(BaseModel):

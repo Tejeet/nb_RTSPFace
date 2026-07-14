@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api.js";
 import { useEvent, useEventState } from "../lib/useEvents.js";
 import FaceCard from "../components/FaceCard.jsx";
+import ZoneEditor from "../components/ZoneEditor.jsx";
 
 export default function LivePage() {
   const status = useEventState("live_status");
   const [recent, setRecent] = useState([]);
+  const imgRef = useRef(null);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     api.recentFaces(8).then(setRecent).catch(() => {});
@@ -35,14 +38,15 @@ export default function LivePage() {
         </div>
       </header>
 
-      <div className="live-frame">
+      <div className="live-frame" ref={containerRef}>
         {status?.camera_connected === false ? (
           <div className="live-offline">
             Camera offline — reconnecting automatically…
           </div>
         ) : (
-          <img src="/api/stream/live" alt="Live camera stream" />
+          <img ref={imgRef} src="/api/stream/live" alt="Live camera stream" />
         )}
+        <ZoneEditor imgRef={imgRef} containerRef={containerRef} />
       </div>
 
       <h2 className="section-title">Latest captures</h2>

@@ -69,10 +69,24 @@ button { font: inherit; cursor: pointer; }
 .live-frame {
   background: #000; border: 1px solid var(--border); border-radius: var(--radius);
   overflow: hidden; aspect-ratio: 16 / 9; display: flex;
-  align-items: center; justify-content: center;
+  align-items: center; justify-content: center; position: relative;
 }
 .live-frame img { width: 100%; height: 100%; object-fit: contain; }
 .live-offline { color: var(--muted); }
+
+/* ---- Zone editor ---------------------------------------------------- */
+.zone-overlay { position: absolute; cursor: crosshair; z-index: 5; }
+.zone-polygon {
+  fill: rgba(255, 200, 60, 0.15); stroke: #ffc83c;
+  vector-effect: non-scaling-stroke; stroke-width: 2px;
+}
+.zone-point { fill: #ffc83c; stroke: #000; stroke-width: 0.2; }
+.zone-toolbar {
+  position: absolute; bottom: 10px; left: 10px; z-index: 6;
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(14, 17, 22, 0.85); padding: 8px 12px;
+  border-radius: var(--radius); border: 1px solid var(--border);
+}
 
 /* ---- Face cards ----------------------------------------------------------- */
 .face-grid {
@@ -121,6 +135,11 @@ button { font: inherit; cursor: pointer; }
 .meta-table td:first-child { color: var(--muted); width: 190px; }
 .meta-table td:last-child { word-break: break-all; }
 
+.full-frame-preview {
+  width: 100%; max-width: 560px; border-radius: var(--radius);
+  border: 1px solid var(--border); display: block;
+}
+
 .dup-list { display: flex; flex-direction: column; gap: 10px; }
 .dup-item {
   display: flex; gap: 12px; align-items: center; background: var(--surface);
@@ -153,6 +172,24 @@ button { font: inherit; cursor: pointer; }
 .stat-accent .stat-value { color: var(--accent); }
 .stat-warn .stat-value { color: var(--warn); }
 .stat-bad .stat-value { color: var(--bad); }
+
+/* ---- Settings ------------------------------------------------------------------------ */
+.settings-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px 22px; margin-bottom: 20px;
+  max-width: 720px;
+}
+.settings-card .section-title { margin-top: 0; }
+.settings-note { font-size: 13.5px; margin: 8px 0 14px; line-height: 1.5; }
+.radio-row {
+  display: flex; gap: 12px; align-items: flex-start; cursor: pointer;
+  padding: 12px 14px; border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 10px;
+}
+.radio-row.selected { border-color: var(--accent); background: var(--accent-dim); }
+.radio-row input { margin-top: 4px; accent-color: var(--accent); }
+.radio-title { font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.settings-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
 
 /* ---- Pager ------------------------------------------------------------------------- */
 .pager {

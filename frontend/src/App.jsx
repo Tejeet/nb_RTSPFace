@@ -5,12 +5,14 @@ import RecentPage from "./pages/RecentPage.jsx";
 import FaceDetailPage from "./pages/FaceDetailPage.jsx";
 import SearchPage from "./pages/SearchPage.jsx";
 import StatsPage from "./pages/StatsPage.jsx";
+import SettingsPage from "./pages/SettingsPage.jsx";
 
 const NAV = [
   { to: "/", label: "Live View", icon: "📹" },
   { to: "/recent", label: "Recent Captures", icon: "🧑" },
   { to: "/search", label: "Search", icon: "🔍" },
   { to: "/stats", label: "Statistics", icon: "📊" },
+  { to: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
 export default function App() {
@@ -52,6 +54,7 @@ export default function App() {
           <Route path="/faces/:id" element={<FaceDetailPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/stats" element={<StatsPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </main>
     </div>

@@ -74,6 +74,40 @@ Two options:
        allowed_modules=['detection','recognition'])"
    ```
 
+## NPU acceleration (Radxa Cubie A7Z and similar)
+
+The pipeline runs all inference through ONNX Runtime, so hardware acceleration is a
+matter of which **execution providers** the installed onnxruntime build ships:
+
+- **Radxa Cubie A7Z** (Allwinner A733, ~3 TOPS NPU — VeriSilicon core): needs an
+  onnxruntime build with the **VSINPU** execution provider (built with TIM-VX and the
+  board's NPU userspace driver from Radxa's OS image).
+- **Rockchip boards** (RK3588 etc.): the **RKNPU** execution provider.
+
+Setup on the A7Z:
+
+1. Start from Radxa's OS image with the NPU driver enabled (check
+   `/dev/galcore` exists).
+2. Replace the stock `onnxruntime` wheel in `backend/requirements.txt` with the
+   vendor/self-built wheel that lists `VSINPUExecutionProvider` in
+   `onnxruntime.get_available_providers()`, and mount the NPU device into the
+   container by adding to the backend service in `docker-compose.yml`:
+   ```yaml
+       devices:
+         - /dev/galcore:/dev/galcore
+   ```
+3. Rebuild (`docker compose up -d --build backend`), open **Dashboard → Settings**,
+   select **NPU**, save, and restart the backend.
+
+The Settings page shows whether an NPU runtime was detected and which providers are
+actually active. Selecting NPU without the runtime is safe — the app logs a warning
+and runs on CPU, so the same image and configuration work across the Pi CM5 (CPU)
+and the A7Z (NPU).
+
+Not every ONNX operator runs on NPUs; ONNX Runtime automatically keeps unsupported
+layers on CPU, so expect a speedup on SCRFD/ArcFace convolutions rather than a strict
+"everything on NPU" execution.
+
 ## Operations
 
 ```bash

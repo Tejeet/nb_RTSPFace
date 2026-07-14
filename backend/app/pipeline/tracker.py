@@ -137,8 +137,9 @@ class ByteTracker:
                 track.state = TrackState.CONFIRMED
             if track.frames_since_update > self._max_lost:
                 track.state = TrackState.LOST
-            elif track.state == TrackState.TENTATIVE and track.frames_since_update > 2:
-                track.state = TrackState.LOST  # tentative tracks die fast
+            elif track.state == TrackState.TENTATIVE and track.frames_since_update > 3:
+                track.state = TrackState.LOST  # tentative tracks die fast, but
+                # tolerate brief detection flicker on small/side faces
             if track.state != TrackState.LOST:
                 alive.append(track)
         self._tracks = alive

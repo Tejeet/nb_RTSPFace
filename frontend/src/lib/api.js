@@ -23,4 +23,19 @@ export const api = {
     form.append("file", file);
     return request(`/api/search?top_k=${topK}`, { method: "POST", body: form });
   },
+  getInferenceSettings: () => request("/api/settings/inference"),
+  setInferenceSettings: (backend) =>
+    request("/api/settings/inference", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ inference_backend: backend }),
+    }),
+  getZone: () => request("/api/zone"),
+  setZone: (points) =>
+    request("/api/zone", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ points }),
+    }),
+  clearZone: () => request("/api/zone", { method: "DELETE" }),
 };

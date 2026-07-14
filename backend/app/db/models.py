@@ -46,6 +46,8 @@ class Face(Base):
     image_path: Mapped[str] = mapped_column(Text, nullable=False)
     thumbnail_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     embedding_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Full camera frame at the moment of capture (optional, SAVE_FULL_FRAME).
+    frame_path: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     detection_confidence: Mapped[float] = mapped_column(Float, nullable=False)
     quality_score: Mapped[float] = mapped_column(Float, nullable=False)

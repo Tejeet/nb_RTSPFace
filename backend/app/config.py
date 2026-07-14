@@ -27,14 +27,14 @@ class Settings(BaseSettings):
     camera_reconnect_max_delay: float = Field(default=30.0, alias="CAMERA_RECONNECT_MAX_DELAY")
 
     # -- Detection -----------------------------------------------------
-    detection_confidence: float = Field(default=0.50, ge=0.0, le=1.0, alias="DETECTION_CONFIDENCE")
+    detection_confidence: float = Field(default=0.40, ge=0.0, le=1.0, alias="DETECTION_CONFIDENCE")
     detection_size: int = Field(default=640, alias="DETECTION_SIZE")
     detect_every_n_frames: int = Field(default=2, ge=1, alias="DETECT_EVERY_N_FRAMES")
     min_face_size: int = Field(default=40, ge=8, alias="MIN_FACE_SIZE")
 
     # -- Tracking ------------------------------------------------------
     track_match_iou: float = Field(default=0.30, alias="TRACK_MATCH_IOU")
-    track_min_hits: int = Field(default=3, ge=1, alias="TRACK_MIN_HITS")
+    track_min_hits: int = Field(default=2, ge=1, alias="TRACK_MIN_HITS")
     track_max_lost_frames: int = Field(default=30, ge=1, alias="TRACK_MAX_LOST_FRAMES")
     track_low_score_threshold: float = Field(default=0.30, alias="TRACK_LOW_SCORE_THRESHOLD")
 
@@ -46,12 +46,21 @@ class Settings(BaseSettings):
     face_crop_padding: float = Field(default=0.20, ge=0.0, le=1.0, alias="FACE_CROP_PADDING")
     face_crop_size: int = Field(default=224, alias="FACE_CROP_SIZE")
     jpeg_quality: int = Field(default=90, ge=10, le=100, alias="JPEG_QUALITY")
+    # Also store the full camera frame at the moment of each capture.
+    save_full_frame: bool = Field(default=True, alias="SAVE_FULL_FRAME")
 
     # -- Quality gate ----------------------------------------------------
     quality_min_score: float = Field(default=0.45, ge=0.0, le=1.0, alias="QUALITY_MIN_SCORE")
     quality_blur_threshold: float = Field(default=45.0, alias="QUALITY_BLUR_THRESHOLD")
     quality_brightness_min: int = Field(default=40, alias="QUALITY_BRIGHTNESS_MIN")
     quality_brightness_max: int = Field(default=215, alias="QUALITY_BRIGHTNESS_MAX")
+
+    # -- Inference hardware -------------------------------------------------
+    # "cpu" or "npu". NPU uses an ONNX Runtime NPU execution provider when one
+    # is installed (e.g. VSINPU on Radxa Cubie A7Z / Allwinner A733, RKNPU on
+    # Rockchip) and falls back to CPU with a visible warning otherwise. The
+    # dashboard Settings page can override this (persisted in the data volume).
+    inference_backend: str = Field(default="cpu", alias="INFERENCE_BACKEND")
 
     # -- Embeddings / vector search ---------------------------------------
     embedding_model: str = Field(default="buffalo_l", alias="EMBEDDING_MODEL")
@@ -83,6 +92,10 @@ class Settings(BaseSettings):
     @property
     def faces_dir(self) -> Path:
         return self.storage_root / "faces"
+
+    @property
+    def frames_dir(self) -> Path:
+        return self.storage_root / "frames"
 
     @property
     def embeddings_dir(self) -> Path:
@@ -120,6 +133,7 @@ class Settings(BaseSettings):
         """Create the full on-disk storage layout if missing."""
         for path in (
             self.faces_dir,
+            self.frames_dir,
             self.embeddings_dir,
             self.database_dir,
             self.logs_dir,

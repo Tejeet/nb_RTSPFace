@@ -4,7 +4,12 @@ Detection and tracking always cover the full frame (stable Track IDs,
 complete live view); the zone only filters the capture/save decision.
 Coordinates are normalized (0..1, origin top-left) so one setting works
 for any stream resolution.
+
+The zone is mutable at runtime (edited from the dashboard) and shared
+between the detection worker and API handlers, hence the lock.
 """
+
+import threading
 
 import numpy as np
 
@@ -12,27 +17,43 @@ import cv2
 
 
 class CaptureZone:
-    """Polygon test for face capture eligibility."""
+    """Thread-safe polygon test for face capture eligibility."""
 
     def __init__(self, points: list[tuple[float, float]] | None) -> None:
         """`points` are normalized (x, y) vertices; None/empty disables the zone."""
-        self._norm_points = points or []
-        self._cached_size: tuple[int, int] | None = None
-        self._cached_polygon: np.ndarray | None = None
+        self._lock = threading.Lock()
+        self._norm_points: list[tuple[float, float]] = []
+        self._cache: dict[tuple[int, int], np.ndarray] = {}
+        self.set_points(points)
 
     @property
     def enabled(self) -> bool:
-        return len(self._norm_points) >= 3
+        with self._lock:
+            return len(self._norm_points) >= 3
+
+    def get_points(self) -> list[tuple[float, float]]:
+        """Current normalized vertices (empty when disabled)."""
+        with self._lock:
+            return list(self._norm_points)
+
+    def set_points(self, points: list[tuple[float, float]] | None) -> None:
+        """Replace the zone polygon (None/empty disables it)."""
+        with self._lock:
+            self._norm_points = [(float(x), float(y)) for x, y in (points or [])]
+            self._cache.clear()
 
     def polygon_px(self, frame_w: int, frame_h: int) -> np.ndarray:
         """Vertices in pixel coordinates for the given frame size (cached)."""
-        if self._cached_size != (frame_w, frame_h):
-            self._cached_polygon = np.array(
-                [[int(x * frame_w), int(y * frame_h)] for x, y in self._norm_points],
-                dtype=np.int32,
-            )
-            self._cached_size = (frame_w, frame_h)
-        return self._cached_polygon
+        key = (frame_w, frame_h)
+        with self._lock:
+            polygon = self._cache.get(key)
+            if polygon is None:
+                polygon = np.array(
+                    [[int(x * frame_w), int(y * frame_h)] for x, y in self._norm_points],
+                    dtype=np.int32,
+                )
+                self._cache[key] = polygon
+            return polygon
 
     def contains_bbox(
         self, bbox: tuple[int, int, int, int], frame_w: int, frame_h: int
@@ -44,6 +65,20 @@ class CaptureZone:
         center = (float(x + w / 2), float(y + h / 2))
         polygon = self.polygon_px(frame_w, frame_h)
         return cv2.pointPolygonTest(polygon, center, measureDist=False) >= 0
+
+    @staticmethod
+    def validate_points(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+        """Validate vertices; empty list = disabled. Raises ValueError otherwise."""
+        if not points:
+            return []
+        if len(points) < 3:
+            raise ValueError("A capture zone needs at least 3 points")
+        cleaned: list[tuple[float, float]] = []
+        for x, y in points:
+            if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
+                raise ValueError(f"Zone point ({x}, {y}) outside the 0..1 range")
+            cleaned.append((float(x), float(y)))
+        return cleaned
 
     @staticmethod
     def parse(spec: str) -> list[tuple[float, float]]:
@@ -60,10 +95,5 @@ class CaptureZone:
             parts = pair.split(",")
             if len(parts) != 2:
                 raise ValueError(f"CAPTURE_ZONE: bad point '{pair}' (expected 'x,y')")
-            x, y = float(parts[0]), float(parts[1])
-            if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
-                raise ValueError(f"CAPTURE_ZONE: point '{pair}' outside 0..1 range")
-            points.append((x, y))
-        if len(points) < 3:
-            raise ValueError("CAPTURE_ZONE: a zone needs at least 3 points")
-        return points
+            points.append((float(parts[0]), float(parts[1])))
+        return CaptureZone.validate_points(points)

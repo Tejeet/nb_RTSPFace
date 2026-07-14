@@ -39,8 +39,42 @@ Full detail: everything above plus `bbox {x,y,w,h}`, image dimensions, file size
 `embedding_model`, `embedding_path`, `camera_name`, and `duplicates`
 (`[{face_id, similarity, thumbnail_url}]`).
 
-### `GET /api/faces/{id}/image` · `GET /api/faces/{id}/thumbnail`
-The stored JPEG / 96 px thumbnail.
+### `GET /api/faces/{id}/image` · `GET /api/faces/{id}/thumbnail` · `GET /api/faces/{id}/frame`
+The stored face JPEG / 96 px thumbnail / full camera frame at capture time
+(404 when `SAVE_FULL_FRAME` was off for that capture).
+
+## Capture zone
+
+### `GET /api/zone`
+Current region of interest: `{ "points": [[x, y], …], "enabled": bool }`
+(normalized 0–1 coordinates; empty = whole frame).
+
+### `PUT /api/zone`
+Replace the zone: body `{ "points": [[0.2, 0.3], [0.8, 0.3], [0.8, 0.9]] }`
+(≥3 points, each in 0–1). Applies immediately, persists across restarts,
+and overrides the `CAPTURE_ZONE` env default.
+
+### `DELETE /api/zone`
+Disable the zone (capture anywhere in the frame).
+
+## Settings
+
+### `GET /api/settings/inference`
+Inference backend state:
+```json
+{
+  "inference_backend": "npu", "running_backend": "cpu",
+  "npu_active": false, "npu_runtime_available": false,
+  "active_providers": ["CPUExecutionProvider"],
+  "requires_restart": true,
+  "model_pack": "buffalo_l", "detection_size": 640
+}
+```
+
+### `PUT /api/settings/inference`
+Body `{ "inference_backend": "cpu" | "npu" }`. Persists in the data volume;
+takes effect when the backend container restarts (`requires_restart` tells
+the UI to prompt).
 
 ### `DELETE /api/faces/{id}`
 Removes the database row, FAISS vector, image, thumbnail and embedding file.
