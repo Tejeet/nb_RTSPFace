@@ -4,7 +4,10 @@
       "Bash(stubtest/bin/pip install *)",
       "Bash(stubtest/bin/python test_stub.py)",
       "Bash(python3 -m compileall -q backend/app)",
-      "Bash(stubtest/bin/python test_zone.py)"
+      "Bash(stubtest/bin/python test_zone.py)",
+      "Bash(bash -n bitBucketUpdate.sh)",
+      "Bash(python3 -c \"import yaml,sys; yaml.safe_load\\(open\\('.github/workflows/docker-build.yml'\\)\\); yaml.safe_load\\(open\\('docker-compose.yml'\\)\\); print\\('YAML OK'\\)\")",
+      "Bash(python3 -c \"print\\('yaml module missing, skipping yaml check'\\)\")"
     ]
   }
 }

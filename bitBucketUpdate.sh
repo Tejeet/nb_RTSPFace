@@ -62,14 +62,30 @@ else
     echo "==> Models already present in ${MODEL_DIR} — skipping download."
 fi
 
-echo "==> Building images (backend + frontend)..."
-$COMPOSE build backend frontend
+# ---- Get images: pull the CI-built image for this exact commit, ----
+# ---- build locally only when it isn't published (yet).          ----
+export IMAGE_TAG="$(git rev-parse HEAD)"
+echo "==> Looking for prebuilt images tagged ${IMAGE_TAG:0:12}..."
+if $COMPOSE pull backend frontend; then
+    echo "==> Prebuilt images pulled from GHCR — no local build needed."
+else
+    echo "==> Prebuilt images not available (CI still running, or first push)."
+    echo "==> Building locally instead..."
+    $COMPOSE build backend frontend
+fi
 
 echo "==> Restarting stack with new images..."
 $COMPOSE up -d
 
-echo "==> Removing old dangling images..."
+echo "==> Removing old images..."
 docker image prune -f
+# Tagged images from previous updates are not "dangling" — remove any tag of
+# our two repos that is not the one now running.
+for repo in ghcr.io/tejeet/nb_rtspface-backend ghcr.io/tejeet/nb_rtspface-frontend; do
+    docker images "$repo" --format '{{.Repository}}:{{.Tag}}' \
+        | grep -v ":${IMAGE_TAG}$" \
+        | xargs -r docker rmi 2>/dev/null || true
+done
 
 echo "==> Waiting for backend to come up..."
 sleep 5

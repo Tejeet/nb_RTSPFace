@@ -1,0 +1,64 @@
+name: Build & Push Images
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # GHCR requires lowercase image names; repository owner may be mixed-case.
+      - name: Compute image names
+        id: names
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "backend=${{ env.REGISTRY }}/${OWNER}/nb_rtspface-backend" >> "$GITHUB_OUTPUT"
+          echo "frontend=${{ env.REGISTRY }}/${OWNER}/nb_rtspface-frontend" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU (arm64 emulation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push backend (linux/arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ steps.names.outputs.backend }}:${{ github.sha }}
+            ${{ steps.names.outputs.backend }}:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+      - name: Build & push frontend (linux/arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ steps.names.outputs.frontend }}:${{ github.sha }}
+            ${{ steps.names.outputs.frontend }}:latest
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max

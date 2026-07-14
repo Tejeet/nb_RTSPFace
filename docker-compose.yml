@@ -4,7 +4,9 @@ services:
   backend:
     build:
       context: ./backend
-    image: edge-face-capture-backend:latest
+    # IMAGE_TAG is set by bitBucketUpdate.sh to the current git commit SHA so
+    # prebuilt CI images are matched exactly; defaults to latest for manual use.
+    image: ghcr.io/tejeet/nb_rtspface-backend:${IMAGE_TAG:-latest}
     container_name: efc-backend
     restart: unless-stopped
     env_file:
@@ -33,7 +35,7 @@ services:
   frontend:
     build:
       context: ./frontend
-    image: edge-face-capture-frontend:latest
+    image: ghcr.io/tejeet/nb_rtspface-frontend:${IMAGE_TAG:-latest}
     container_name: efc-frontend
     restart: unless-stopped
     depends_on:

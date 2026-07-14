@@ -63,8 +63,27 @@ docker run --rm -v efc-storage:/data -v $PWD:/backup alpine \
 
 Run `./bitBucketUpdate.sh` on the device. It pulls origin/master (hard reset — never
 edit tracked files on the device), regenerates `.env` from `.env.example`, downloads
-the InsightFace models into `./models/` if missing, rebuilds both images, restarts
-the stack, and prunes old dangling images.
+the InsightFace models into `./models/` if missing, then gets the images:
+
+1. **Pull first**: every push to master triggers GitHub Actions
+   (`.github/workflows/docker-build.yml`) to build linux/arm64 images and publish
+   them to GHCR tagged with the commit SHA. The script pulls the images matching
+   the exact commit it just checked out.
+2. **Build as fallback**: if no prebuilt image exists yet (CI still running, or
+   GHCR unreachable), it builds locally on the device.
+
+Finally it restarts the stack and removes all older images of both repos.
+
+**One-time GHCR setup**: after the first successful workflow run, open
+github.com → your profile → Packages → `nb_rtspface-backend` / `-frontend` →
+Package settings → Change visibility → **Public**, so the devices can pull without
+credentials. (Alternative: keep them private and `docker login ghcr.io` on each
+device with a token that has `read:packages`.)
+
+Tip: CI builds ARM images under QEMU emulation — the first backend build takes
+~30 min, but the pip layer is cached, so later pushes that only change code build
+in 2–3 minutes. Wait for the green check on GitHub before running the update
+script if you want to avoid the local-build fallback.
 
 ## Models / offline installs
 
