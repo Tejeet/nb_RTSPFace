@@ -15,6 +15,9 @@ services:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - efc-storage:/app/storage
+      # Models pre-downloaded by bitBucketUpdate.sh on the host; shadows the
+      # volume's models dir so the backend never downloads at startup.
+      - ./models:/app/storage/models
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
       interval: 30s

@@ -59,20 +59,20 @@ docker run --rm -v efc-storage:/data -v $PWD:/backup alpine \
   tar czf /backup/efc-storage-$(date +%F).tar.gz -C /data .
 ```
 
-## Offline / air-gapped installs
+## Updating a deployment
 
-Two options:
+Run `./bitBucketUpdate.sh` on the device. It pulls origin/master (hard reset — never
+edit tracked files on the device), regenerates `.env` from `.env.example`, downloads
+the InsightFace models into `./models/` if missing, rebuilds both images, restarts
+the stack, and prunes old dangling images.
 
-1. **Pre-seed the volume.** On a connected machine run the stack once (or download
-   `buffalo_l.zip` from the InsightFace release page), then copy
-   `models/models/buffalo_l/*.onnx` into the volume at the same path on the target.
-2. **Bake into the image.** Add to `backend/Dockerfile` before the CMD (grows the image
-   ~300 MB but makes containers disposable):
-   ```dockerfile
-   RUN python -c "from insightface.app import FaceAnalysis; \
-       FaceAnalysis(name='buffalo_l', root='/app/storage/models', \
-       allowed_modules=['detection','recognition'])"
-   ```
+## Models / offline installs
+
+The host `./models/` directory is bind-mounted over the container's models path, so
+the backend **never downloads models at startup** — `bitBucketUpdate.sh` fetches
+`buffalo_l.zip` (~300 MB) once and reuses it forever. For air-gapped devices, copy
+the `models/` folder from a connected machine into the repo root before deploying;
+the expected layout is `models/models/buffalo_l/*.onnx`.
 
 ## NPU acceleration (Radxa Cubie A7Z and similar)
 

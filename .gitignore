@@ -14,6 +14,8 @@ frontend/dist/
 
 # Runtime data (mounted volumes)
 storage/
+# Pre-downloaded ONNX models (~300 MB; fetched by bitBucketUpdate.sh)
+models/
 *.sqlite3
 *.db
 *.log
