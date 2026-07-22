@@ -10,6 +10,11 @@
 # and pass it as the argument:
 #   https://github.com/hailo-ai/hailo_model_zoo
 # ============================================================
+# Uses bash arrays; re-exec under bash if started with sh/dash.
+if [ -z "${BASH_VERSION:-}" ]; then
+    exec bash "$0" "$@"
+fi
+
 set -uo pipefail
 
 cd "$(dirname "$0")/.."

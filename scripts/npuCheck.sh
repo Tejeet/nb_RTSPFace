@@ -4,6 +4,10 @@
 # Collects everything needed to decide how to enable NPU inference.
 # Usage:  bash scripts/npuCheck.sh
 # ============================================================
+if [ -z "${BASH_VERSION:-}" ]; then
+    exec bash "$0" "$@"
+fi
+
 set +e
 
 section() { echo ""; echo "===== $1 ====="; }

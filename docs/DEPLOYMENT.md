@@ -104,14 +104,20 @@ and would otherwise contend with detection for the device.
 Run `bash scripts/hailoCheck.sh` first — it verifies all four prerequisites and
 prints exactly which one is missing.
 
-**1. Host driver.** On Raspberry Pi OS:
+**1. Host driver.**
 ```bash
-sudo apt install hailo-all      # driver + firmware + HailoRT
+sudo bash scripts/installHailo.sh   # apt packages + verification
 sudo reboot
 ```
 Then confirm `/dev/hailo0` exists and `hailortcli fw-control identify` responds.
-On a CM5 with a PCIe switch, also check the link trained (`LnkSta` in
-`scripts/hailoCheck.sh` output) — Hailo-8 wants Gen3 x1 or better.
+
+*On PCIe link speed:* behind a switch/multiplexer the Hailo-8 often trains down
+(e.g. `LnkSta: Speed 5GT/s, Width x1` through an ASM1182e Gen2 switch, versus the
+card's Gen3 x4 capability). For this workload that is **not** a bottleneck: SCRFD
+at 640×640 moves ~1.2 MB in and ~1.0 MB of raw head tensors out per frame, so
+~2.2 MB per inference. A Gen2 x1 link (~400 MB/s usable) sustains roughly 180
+inferences/second — an order of magnitude beyond the 10–15 FPS target. Only
+consider the link if you later run much larger models or several streams.
 
 **2. HailoRT inside the container.** The Python wheel is not publicly
 redistributable, so download it from the [Hailo Developer

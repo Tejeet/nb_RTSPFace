@@ -6,6 +6,10 @@
 #   1. PCIe device visible   2. hailo_pci driver bound
 #   3. /dev/hailo0 node      4. HailoRT userspace
 # ============================================================
+if [ -z "${BASH_VERSION:-}" ]; then
+    exec bash "$0" "$@"
+fi
+
 set +e
 
 section() { echo ""; echo "===== $1 ====="; }
@@ -19,7 +23,13 @@ echo "--- driver binding ---"
 for dev in /sys/bus/pci/devices/*; do
     if grep -qi "1e60" "$dev/vendor" 2>/dev/null; then
         echo "device: $(basename "$dev")"
-        echo "driver: $(basename "$(readlink -f "$dev/driver" 2>/dev/null)" 2>/dev/null || echo 'NONE BOUND')"
+        # readlink -f canonicalises even non-existent paths, so test the symlink
+        # itself — otherwise an unbound device misreports as driver "driver".
+        if [ -L "$dev/driver" ]; then
+            echo "driver: $(basename "$(readlink -f "$dev/driver")")"
+        else
+            echo "driver: NONE BOUND"
+        fi
     fi
 done
 dmesg 2>/dev/null | grep -i hailo | tail -10
