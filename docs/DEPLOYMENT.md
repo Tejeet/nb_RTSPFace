@@ -112,13 +112,20 @@ sudo reboot
 Then confirm `/dev/hailo0` exists and `hailortcli fw-control identify` responds.
 
 *If the packages are installed but `/dev/hailo0` is still missing:* `hailort-pcie-driver`
-is a DKMS module that must be compiled against the **booted** kernel. An `apt` run that
-also upgrades the kernel leaves the module built for the old one, and very new kernels
-can fail to build at all. Run `sudo bash scripts/hailoDriverFix.sh` — it prints the DKMS
-status, the real `modprobe` error, attempts a rebuild, and dumps the build log on
-failure. If the build genuinely fails against a newer kernel, boot the kernel the driver
-supports (`sudo apt install linux-image-rpi-2712=<older-version>`) or wait for a HailoRT
-release that supports it; nothing else will bring the device up.
+is an `arch:all` package — it ships **DKMS source**, not a prebuilt module. If `dkms` or
+the kernel headers are absent it installs without error and compiles nothing, so
+`modprobe hailo_pci` reports *"Module hailo_pci not found"*. The same applies after a
+kernel upgrade: the module must be rebuilt for the newly booted kernel.
+
+```bash
+sudo bash scripts/hailoDriverFix.sh
+```
+
+It installs `dkms` + headers if missing, registers and builds the source tree found
+under `/usr/src/*hailo*`, runs `depmod`, loads the module, and dumps the DKMS build log
+if compilation fails. If the build genuinely fails against a very new kernel, boot one
+the driver supports (`sudo apt install linux-image-rpi-2712=<older-version>`) or wait
+for a HailoRT release that supports it — nothing else will bring the device up.
 
 *On PCIe link speed:* behind a switch/multiplexer the Hailo-8 often trains down
 (e.g. `LnkSta: Speed 5GT/s, Width x1` through an ASM1182e Gen2 switch, versus the

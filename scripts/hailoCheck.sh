@@ -21,9 +21,14 @@ section "2. Kernel driver"
 echo "booted kernel: $(uname -r)"
 lsmod | grep -i hailo || echo "hailo_pci module NOT loaded"
 echo "--- dkms (module must be built for the BOOTED kernel) ---"
-command -v dkms >/dev/null && dkms status 2>/dev/null | grep -i hailo || echo "no hailo dkms entry"
-find "/lib/modules/$(uname -r)" -name "hailo*.ko*" 2>/dev/null \
-    || echo "no hailo .ko under the booted kernel's modules"
+if command -v dkms >/dev/null; then
+    dkms status 2>/dev/null | grep -i hailo || echo "no hailo dkms entry"
+else
+    echo "dkms NOT INSTALLED — an arch:all driver package cannot build without it"
+fi
+# `find` exits 0 even when it matches nothing, so test the output, not the status.
+KO="$(find "/lib/modules/$(uname -r)" -name "hailo*.ko*" 2>/dev/null)"
+[ -n "$KO" ] && echo "$KO" || echo "no hailo .ko under the booted kernel's modules"
 echo "--- driver binding ---"
 for dev in /sys/bus/pci/devices/*; do
     if grep -qi "1e60" "$dev/vendor" 2>/dev/null; then

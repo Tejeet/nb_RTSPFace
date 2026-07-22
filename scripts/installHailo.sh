@@ -21,6 +21,14 @@ apt-get update -qq
 apt-cache search hailo | sort || true
 echo ""
 
+# hailort-pcie-driver is arch:all — it ships DKMS source, not a compiled module.
+# Without dkms and matching headers it installs "successfully" but builds
+# nothing, and /dev/hailo0 never appears. Get these in place first.
+echo "===== build prerequisites (dkms + kernel headers) ====="
+apt-get install -y dkms "linux-headers-$(uname -r)" 2>/dev/null \
+    || apt-get install -y dkms linux-headers-rpi-2712 \
+    || echo "WARNING: could not install dkms/headers — the driver will not build"
+
 # hailo-all is the Raspberry Pi metapackage (driver + firmware + HailoRT +
 # Python bindings). Fall back to the individual packages if it is absent.
 if apt-cache show hailo-all >/dev/null 2>&1; then
