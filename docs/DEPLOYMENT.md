@@ -111,6 +111,15 @@ sudo reboot
 ```
 Then confirm `/dev/hailo0` exists and `hailortcli fw-control identify` responds.
 
+*If the packages are installed but `/dev/hailo0` is still missing:* `hailort-pcie-driver`
+is a DKMS module that must be compiled against the **booted** kernel. An `apt` run that
+also upgrades the kernel leaves the module built for the old one, and very new kernels
+can fail to build at all. Run `sudo bash scripts/hailoDriverFix.sh` — it prints the DKMS
+status, the real `modprobe` error, attempts a rebuild, and dumps the build log on
+failure. If the build genuinely fails against a newer kernel, boot the kernel the driver
+supports (`sudo apt install linux-image-rpi-2712=<older-version>`) or wait for a HailoRT
+release that supports it; nothing else will bring the device up.
+
 *On PCIe link speed:* behind a switch/multiplexer the Hailo-8 often trains down
 (e.g. `LnkSta: Speed 5GT/s, Width x1` through an ASM1182e Gen2 switch, versus the
 card's Gen3 x4 capability). For this workload that is **not** a bottleneck: SCRFD

@@ -18,7 +18,12 @@ section "1. PCIe device"
 lspci | grep -i hailo || echo "NOT FOUND on the PCIe bus"
 
 section "2. Kernel driver"
+echo "booted kernel: $(uname -r)"
 lsmod | grep -i hailo || echo "hailo_pci module NOT loaded"
+echo "--- dkms (module must be built for the BOOTED kernel) ---"
+command -v dkms >/dev/null && dkms status 2>/dev/null | grep -i hailo || echo "no hailo dkms entry"
+find "/lib/modules/$(uname -r)" -name "hailo*.ko*" 2>/dev/null \
+    || echo "no hailo .ko under the booted kernel's modules"
 echo "--- driver binding ---"
 for dev in /sys/bus/pci/devices/*; do
     if grep -qi "1e60" "$dev/vendor" 2>/dev/null; then
@@ -38,8 +43,13 @@ section "3. Device node"
 ls -l /dev/hailo* 2>/dev/null || echo "/dev/hailo0 MISSING (driver not loaded or failed to probe)"
 
 section "4. HailoRT userspace"
-command -v hailortcli >/dev/null && hailortcli fw-control identify 2>&1 | head -20 \
-    || echo "hailortcli NOT installed"
+# Explicit if: `a && b | head || c` swallows the failure branch.
+if command -v hailortcli >/dev/null; then
+    echo "--- hailortcli fw-control identify ---"
+    hailortcli fw-control identify 2>&1 | head -20
+else
+    echo "hailortcli NOT installed"
+fi
 echo "--- python bindings (host) ---"
 python3 -c "import hailo_platform; print('hailo_platform', hailo_platform.__version__)" 2>/dev/null \
     || echo "hailo_platform NOT importable on host"
