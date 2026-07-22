@@ -23,6 +23,19 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && apt-get purge -y build-essential g++ \
     && apt-get autoremove -y
 
+# Optional HailoRT for the Hailo-8 PCIe accelerator. The wheel is not publicly
+# redistributable, so drop it into backend/vendor/ yourself (Hailo Developer
+# Zone → HailoRT → Python package matching the host driver AND cp312). The
+# build works with an empty vendor/ — Hailo mode then reports "HailoRT missing"
+# and the app runs on CPU.
+COPY vendor/ ./vendor/
+RUN if ls vendor/hailort*.whl >/dev/null 2>&1; then \
+        echo "Installing HailoRT from vendor/" && \
+        pip install --no-cache-dir vendor/hailort*.whl; \
+    else \
+        echo "No HailoRT wheel in vendor/ — Hailo backend will be unavailable"; \
+    fi
+
 COPY app ./app
 COPY pyproject.toml .
 

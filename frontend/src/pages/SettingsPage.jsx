@@ -73,7 +73,7 @@ export default function SettingsPage() {
           />
           <div>
             <div className="radio-title">
-              NPU{" "}
+              NPU (on-SoC){" "}
               {info.npu_runtime_available ? (
                 <span className="badge badge-quality">runtime detected</span>
               ) : (
@@ -81,7 +81,36 @@ export default function SettingsPage() {
               )}
             </div>
             <div className="muted">
-              Neural accelerator via ONNX Runtime (VeriSilicon VSINPU / Rockchip RKNPU)
+              Built-in accelerator via ONNX Runtime — Radxa Cubie A7Z (VSINPU),
+              Rockchip (RKNPU)
+            </div>
+          </div>
+        </label>
+
+        <label className={`radio-row${selected === "hailo" ? " selected" : ""}`}>
+          <input
+            type="radio"
+            name="backend"
+            checked={selected === "hailo"}
+            onChange={() => setSelected("hailo")}
+          />
+          <div>
+            <div className="radio-title">
+              Hailo-8 (PCIe){" "}
+              {info.hailo_runtime_available ? (
+                <span className="badge badge-quality">HailoRT installed</span>
+              ) : (
+                <span className="badge badge-dup">HailoRT missing</span>
+              )}{" "}
+              {info.hailo_device_present ? (
+                <span className="badge badge-quality">/dev/hailo0 present</span>
+              ) : (
+                <span className="badge badge-dup">no device node</span>
+              )}
+            </div>
+            <div className="muted">
+              SCRFD detection on the Hailo-8 accelerator (compiled .hef models);
+              embeddings stay on CPU unless a recognition HEF is configured
             </div>
           </div>
         </label>
@@ -119,6 +148,10 @@ export default function SettingsPage() {
               <td>{info.npu_active ? "Yes" : "No"}</td>
             </tr>
             <tr>
+              <td>Hailo-8 in use</td>
+              <td>{info.hailo_active ? "Yes" : "No"}</td>
+            </tr>
+            <tr>
               <td>Active ONNX providers</td>
               <td>{info.active_providers.join(", ") || "—"}</td>
             </tr>
@@ -132,11 +165,17 @@ export default function SettingsPage() {
             </tr>
           </tbody>
         </table>
-        {!info.npu_runtime_available && (
+        {info.backend_error && (
+          <p className="settings-note backend-error">
+            <strong>Fell back to CPU:</strong> {info.backend_error}
+          </p>
+        )}
+        {!info.npu_runtime_available && !info.hailo_runtime_available && (
           <p className="muted settings-note">
-            To enable NPU processing this container needs an ONNX Runtime build that
-            includes the board&apos;s NPU execution provider (see docs/DEPLOYMENT.md →
-            “NPU acceleration”). Until then the NPU option safely runs on CPU.
+            No accelerator runtime is installed in this container. NPU mode needs an
+            ONNX Runtime build with the board&apos;s execution provider; Hailo mode needs
+            HailoRT plus compiled <code>.hef</code> models (see docs/DEPLOYMENT.md).
+            Either option safely runs on CPU until then.
           </p>
         )}
       </section>

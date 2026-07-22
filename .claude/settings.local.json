@@ -8,7 +8,12 @@
       "Bash(bash -n bitBucketUpdate.sh)",
       "Bash(python3 -c \"import yaml,sys; yaml.safe_load\\(open\\('.github/workflows/docker-build.yml'\\)\\); yaml.safe_load\\(open\\('docker-compose.yml'\\)\\); print\\('YAML OK'\\)\")",
       "Bash(python3 -c \"print\\('yaml module missing, skipping yaml check'\\)\")",
-      "Bash(stubtest/bin/python test_npu.py)"
+      "Bash(stubtest/bin/python test_npu.py)",
+      "Bash(bash -n scripts/hailoCheck.sh)",
+      "Bash(chmod +x scripts/*.sh)",
+      "Bash(bash -n scripts/fetchHailoModels.sh)",
+      "Bash(venv/bin/python test_scrfd.py)",
+      "Bash(venv/bin/python test_hailo_fallback.py)"
     ]
   }
 }

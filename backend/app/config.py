@@ -56,11 +56,20 @@ class Settings(BaseSettings):
     quality_brightness_max: int = Field(default=215, alias="QUALITY_BRIGHTNESS_MAX")
 
     # -- Inference hardware -------------------------------------------------
-    # "cpu" or "npu". NPU uses an ONNX Runtime NPU execution provider when one
-    # is installed (e.g. VSINPU on Radxa Cubie A7Z / Allwinner A733, RKNPU on
-    # Rockchip) and falls back to CPU with a visible warning otherwise. The
-    # dashboard Settings page can override this (persisted in the data volume).
+    # "cpu", "npu" or "hailo".
+    #   npu   → ONNX Runtime NPU execution provider (VSINPU on Radxa Cubie A7Z /
+    #           Allwinner A733, RKNPU on Rockchip)
+    #   hailo → Hailo-8 PCIe accelerator via HailoRT + compiled .hef models
+    # Any backend that cannot be initialised falls back to CPU with the reason
+    # shown on the dashboard Settings page. The dashboard can override this
+    # value (persisted in the data volume).
     inference_backend: str = Field(default="cpu", alias="INFERENCE_BACKEND")
+
+    # Compiled Hailo models. Relative names resolve under <models>/hailo/.
+    hailo_detection_hef: str = Field(default="scrfd_10g.hef", alias="HAILO_DETECTION_HEF")
+    # Empty = keep ArcFace embeddings on the CPU (recommended: the two networks
+    # otherwise contend for the accelerator, and embeddings are infrequent).
+    hailo_recognition_hef: str = Field(default="", alias="HAILO_RECOGNITION_HEF")
 
     # -- Embeddings / vector search ---------------------------------------
     embedding_model: str = Field(default="buffalo_l", alias="EMBEDDING_MODEL")
@@ -96,6 +105,24 @@ class Settings(BaseSettings):
     @property
     def frames_dir(self) -> Path:
         return self.storage_root / "frames"
+
+    @property
+    def hailo_models_dir(self) -> Path:
+        return self.models_dir / "hailo"
+
+    @property
+    def hailo_detection_hef_path(self) -> Path:
+        """Absolute path to the detection HEF (bare names resolve under hailo/)."""
+        candidate = Path(self.hailo_detection_hef)
+        return candidate if candidate.is_absolute() else self.hailo_models_dir / candidate
+
+    @property
+    def hailo_recognition_hef_path(self) -> Path | None:
+        """Absolute path to the recognition HEF, or None when CPU is used."""
+        if not self.hailo_recognition_hef.strip():
+            return None
+        candidate = Path(self.hailo_recognition_hef)
+        return candidate if candidate.is_absolute() else self.hailo_models_dir / candidate
 
     @property
     def embeddings_dir(self) -> Path:
@@ -140,6 +167,7 @@ class Settings(BaseSettings):
             self.thumbnails_dir,
             self.cache_dir,
             self.models_dir,
+            self.hailo_models_dir,
         ):
             path.mkdir(parents=True, exist_ok=True)
 

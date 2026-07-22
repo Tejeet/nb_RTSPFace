@@ -113,6 +113,7 @@ class SystemStats(BaseModel):
     disk_free_gb: float
     temperature_c: float | None
     npu_percent: float | None = None  # only on boards exposing an NPU load node
+    accelerator_temperature_c: float | None = None  # Hailo-8 chip temperature
     uptime_seconds: float
     queues: QueueSizes
 
@@ -138,10 +139,14 @@ class HealthStatus(BaseModel):
 class InferenceInfo(BaseModel):
     """Inference backend state shown on the Settings page."""
 
-    inference_backend: str  # requested/persisted: "cpu" | "npu"
-    running_backend: str  # what the current process started with
+    inference_backend: str  # requested/persisted: "cpu" | "npu" | "hailo"
+    running_backend: str  # what actually loaded (may differ after a fallback)
     npu_active: bool
     npu_runtime_available: bool
+    hailo_active: bool = False
+    hailo_runtime_available: bool = False
+    hailo_device_present: bool = False
+    backend_error: str | None = None  # why the requested backend fell back
     active_providers: list[str]
     requires_restart: bool
     model_pack: str

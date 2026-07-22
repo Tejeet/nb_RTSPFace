@@ -20,11 +20,13 @@ services:
       # Models pre-downloaded by bitBucketUpdate.sh on the host; shadows the
       # volume's models dir so the backend never downloads at startup.
       - ./models:/app/storage/models
-      # --- Radxa Cubie A7Z / NPU boards: uncomment both lines below so the
-      # --- dashboard can read NPU utilization from the kernel debug nodes.
+      # --- Radxa Cubie A7Z / NPU boards: uncomment so the dashboard can read
+      # --- NPU utilization from the kernel debug nodes.
       # - /sys/kernel/debug:/sys/kernel/debug:ro
+    # Accelerators: uncomment the line for the hardware actually fitted.
     # devices:
-    #   - /dev/galcore:/dev/galcore   # NPU device (required for VSINPU inference)
+    #   - /dev/hailo0:/dev/hailo0     # Hailo-8 PCIe (INFERENCE_BACKEND=hailo)
+    #   - /dev/galcore:/dev/galcore   # VeriSilicon NPU (INFERENCE_BACKEND=npu)
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
       interval: 30s

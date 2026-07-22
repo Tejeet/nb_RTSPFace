@@ -73,6 +73,14 @@ export default function StatsPage() {
             tone="accent"
           />
         )}
+        {stats.accelerator_temperature_c != null && (
+          <StatCard
+            label="Hailo-8 temp"
+            value={stats.accelerator_temperature_c.toFixed(1)}
+            unit="°C"
+            tone={tone(stats.accelerator_temperature_c, 75, 85)}
+          />
+        )}
         <StatCard label="Uptime" value={formatUptime(stats.uptime_seconds)} />
       </div>
     </div>

@@ -93,6 +93,53 @@ the backend **never downloads models at startup** — `bitBucketUpdate.sh` fetch
 the `models/` folder from a connected machine into the repo root before deploying;
 the expected layout is `models/models/buffalo_l/*.onnx`.
 
+## Hailo-8 acceleration (Raspberry Pi + PCIe)
+
+The Hailo-8 does **not** work through ONNX Runtime execution providers. It runs its
+own compiled `.hef` binaries through HailoRT, so it is a separate backend
+(`INFERENCE_BACKEND=hailo`). SCRFD detection moves to the accelerator; ArcFace
+embeddings stay on the CPU by default, because they run only a few times per minute
+and would otherwise contend with detection for the device.
+
+Run `bash scripts/hailoCheck.sh` first — it verifies all four prerequisites and
+prints exactly which one is missing.
+
+**1. Host driver.** On Raspberry Pi OS:
+```bash
+sudo apt install hailo-all      # driver + firmware + HailoRT
+sudo reboot
+```
+Then confirm `/dev/hailo0` exists and `hailortcli fw-control identify` responds.
+On a CM5 with a PCIe switch, also check the link trained (`LnkSta` in
+`scripts/hailoCheck.sh` output) — Hailo-8 wants Gen3 x1 or better.
+
+**2. HailoRT inside the container.** The Python wheel is not publicly
+redistributable, so download it from the [Hailo Developer
+Zone](https://hailo.ai/developer-zone/) and drop it in `backend/vendor/`. It must be
+`cp312` + `linux_aarch64` **and** match the host driver version. See
+`backend/vendor/README.md`.
+
+**3. Compiled models.**
+```bash
+bash scripts/fetchHailoModels.sh
+```
+This pulls `scrfd_10g.hef` (required) and `arcface_mobilefacenet.hef` (optional)
+from the public Hailo Model Zoo bucket into `models/models/hailo/`.
+
+**4. Map the device.** Uncomment in `docker-compose.yml`:
+```yaml
+    devices:
+      - /dev/hailo0:/dev/hailo0
+```
+
+**5. Enable it.** Set `INFERENCE_BACKEND=hailo` in `.env.example` (or choose
+**Hailo-8** on the dashboard Settings page), then restart the backend.
+
+The Settings page reports whether HailoRT and the device node were found, whether
+Hailo is actually in use, and — if it fell back — the exact reason. A missing wheel,
+driver or HEF never crashes the container; it logs the cause and runs on CPU.
+Statistics gains a Hailo-8 chip-temperature tile once the accelerator is live.
+
 ## NPU acceleration (Radxa Cubie A7Z and similar)
 
 The pipeline runs all inference through ONNX Runtime, so hardware acceleration is a

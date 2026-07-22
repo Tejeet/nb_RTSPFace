@@ -16,6 +16,9 @@ frontend/dist/
 storage/
 # Pre-downloaded ONNX models (~300 MB; fetched by bitBucketUpdate.sh)
 models/
+# Vendor wheels (HailoRT) — licensed, not redistributable; keep the README
+backend/vendor/*
+!backend/vendor/README.md
 *.sqlite3
 *.db
 *.log

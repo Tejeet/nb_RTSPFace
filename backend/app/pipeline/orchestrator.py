@@ -51,17 +51,12 @@ class Pipeline:
         self.inference_backend = str(
             self.runtime_settings.get("inference_backend", settings.inference_backend)
         )
-        providers, self.npu_active = resolve_providers(self.inference_backend)
+        self.npu_active = False
+        self.hailo_active = False
+        self.backend_error: str | None = None
 
         # Models (loaded once; shared by detection worker and search API)
-        self.models = FaceModels(
-            model_pack=settings.embedding_model,
-            models_dir=settings.models_dir,
-            detection_size=settings.detection_size,
-            detection_confidence=settings.detection_confidence,
-            min_face_size=settings.min_face_size,
-            providers=providers,
-        )
+        self.models = self._build_models()
 
         self.vector_store = VectorStore(
             index_path=settings.faiss_index_path,
@@ -178,8 +173,87 @@ class Pipeline:
         self.storage_worker.join(timeout=10)
         self.camera.join(timeout=5)
         self.vector_store.save()
+        if hasattr(self.models, "close"):
+            self.models.close()  # release the accelerator, if one is in use
         self.db.dispose()
         logger.info("Pipeline stopped")
+
+    # -- model construction --------------------------------------------------------
+
+    def _build_models(self):
+        """Build the inference backend, falling back to CPU on any failure.
+
+        A misconfigured accelerator must never stop the capture engine: the
+        reason is recorded in `backend_error` and surfaced on the Settings
+        page instead of crashing the container.
+        """
+        settings = self.settings
+
+        if self.inference_backend == "hailo":
+            models = self._try_build_hailo()
+            if models is not None:
+                return models
+
+        providers, self.npu_active = resolve_providers(
+            "npu" if self.inference_backend == "npu" else "cpu"
+        )
+        return FaceModels(
+            model_pack=settings.embedding_model,
+            models_dir=settings.models_dir,
+            detection_size=settings.detection_size,
+            detection_confidence=settings.detection_confidence,
+            min_face_size=settings.min_face_size,
+            providers=providers,
+        )
+
+    def _try_build_hailo(self):
+        """Attempt to load the Hailo backend; returns None (and logs) on failure."""
+        settings = self.settings
+        try:
+            from app.pipeline.hailo_models import HailoFaceModels
+            from app.pipeline.hailo_runtime import (
+                hailo_device_present,
+                hailo_runtime_installed,
+            )
+
+            if not hailo_runtime_installed():
+                raise RuntimeError(
+                    "HailoRT Python package (hailo_platform) is not installed in this "
+                    "container — see docs/DEPLOYMENT.md 'Hailo-8 acceleration'"
+                )
+            if not hailo_device_present():
+                raise RuntimeError(
+                    "/dev/hailo0 not found — load the hailo_pci driver on the host and "
+                    "map the device into the container"
+                )
+
+            detection_hef = settings.hailo_detection_hef_path
+            if not detection_hef.exists():
+                raise RuntimeError(f"Detection HEF not found at {detection_hef}")
+
+            recognition_hef = settings.hailo_recognition_hef_path
+            if recognition_hef is not None and not recognition_hef.exists():
+                logger.warning(
+                    "Recognition HEF %s missing; using CPU for embeddings", recognition_hef
+                )
+                recognition_hef = None
+
+            models = HailoFaceModels(
+                detection_hef=detection_hef,
+                detection_confidence=settings.detection_confidence,
+                min_face_size=settings.min_face_size,
+                models_dir=settings.models_dir,
+                model_pack=settings.embedding_model,
+                recognition_hef=recognition_hef,
+            )
+            self.hailo_active = True
+            self.backend_error = None
+            logger.info("Hailo-8 acceleration active")
+            return models
+        except Exception as error:  # noqa: BLE001 - must degrade, never crash
+            self.backend_error = str(error)
+            logger.warning("Hailo backend unavailable (%s); falling back to CPU", error)
+            return None
 
     # -- inference settings ------------------------------------------------------
 
@@ -188,11 +262,28 @@ class Pipeline:
         requested = str(
             self.runtime_settings.get("inference_backend", self.settings.inference_backend)
         )
+        from app.pipeline.hailo_runtime import (
+            hailo_device_present,
+            hailo_runtime_installed,
+        )
+
+        # What actually loaded may differ from what was requested (fallback).
+        if self.hailo_active:
+            running = "hailo"
+        elif self.npu_active:
+            running = "npu"
+        else:
+            running = "cpu"
+
         return {
             "inference_backend": requested,
-            "running_backend": self.inference_backend,
+            "running_backend": running,
             "npu_active": self.npu_active,
             "npu_runtime_available": npu_runtime_available(),
+            "hailo_active": self.hailo_active,
+            "hailo_runtime_available": hailo_runtime_installed(),
+            "hailo_device_present": hailo_device_present(),
+            "backend_error": self.backend_error,
             "active_providers": self.models.active_providers,
             "requires_restart": requested != self.inference_backend,
             "model_pack": self.settings.embedding_model,
@@ -201,8 +292,8 @@ class Pipeline:
 
     def set_inference_backend(self, backend: str) -> None:
         """Persist the backend choice; applied on the next backend restart."""
-        if backend not in ("cpu", "npu"):
-            raise ValueError("inference_backend must be 'cpu' or 'npu'")
+        if backend not in ("cpu", "npu", "hailo"):
+            raise ValueError("inference_backend must be 'cpu', 'npu' or 'hailo'")
         self.runtime_settings.set("inference_backend", backend)
 
     # -- capture zone ----------------------------------------------------------

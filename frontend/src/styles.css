@@ -190,6 +190,10 @@ button { font: inherit; cursor: pointer; }
 .radio-row input { margin-top: 4px; accent-color: var(--accent); }
 .radio-title { font-weight: 600; display: flex; gap: 8px; align-items: center; }
 .settings-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.backend-error {
+  color: var(--warn); background: #3a2e12; border: 1px solid #5c4718;
+  border-radius: var(--radius); padding: 10px 12px; word-break: break-word;
+}
 
 /* ---- Pager ------------------------------------------------------------------------- */
 .pager {

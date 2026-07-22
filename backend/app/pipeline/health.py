@@ -93,7 +93,16 @@ class HealthMonitor(threading.Thread):
             "disk_free_gb": round(disk.free / (1024**3), 2),
             "temperature_c": read_temperature_c(),
             "npu_percent": read_npu_usage(),
+            "accelerator_temperature_c": self._accelerator_temperature(),
         }
+
+    def _accelerator_temperature(self) -> float | None:
+        """Hailo-8 chip temperature when that accelerator is in use."""
+        if not getattr(self._pipeline, "hailo_active", False):
+            return None
+        from app.pipeline.hailo_runtime import device_temperature_c
+
+        return device_temperature_c()
 
     def run(self) -> None:
         psutil.cpu_percent(interval=None)  # prime the sampler

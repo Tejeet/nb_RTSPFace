@@ -49,7 +49,9 @@ startup by `app/config.py`. Nothing is hardcoded.
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `INFERENCE_BACKEND` | `cpu` | `cpu` or `npu`. NPU selects an ONNX Runtime NPU execution provider (VSINPU on Radxa Cubie A7Z, RKNPU on Rockchip) when the container's onnxruntime build ships one; otherwise it falls back to CPU with a logged warning. The dashboard Settings page can override this (persisted as `database/settings.json` in the volume); changes apply on backend restart |
+| `INFERENCE_BACKEND` | `cpu` | `cpu`, `npu` or `hailo`. `npu` selects an ONNX Runtime NPU execution provider (VSINPU on Radxa Cubie A7Z, RKNPU on Rockchip); `hailo` runs SCRFD on a Hailo-8 PCIe accelerator via HailoRT. Any backend that cannot initialise falls back to CPU with the reason logged and shown on the Settings page. The dashboard overrides this (persisted as `database/settings.json`); changes apply on backend restart |
+| `HAILO_DETECTION_HEF` | `scrfd_10g.hef` | Detection model for `hailo` mode; bare names resolve under `storage/models/hailo/`, absolute paths are used as-is |
+| `HAILO_RECOGNITION_HEF` | *(empty)* | Optional ArcFace HEF. Empty keeps embeddings on the CPU — recommended, since detection and recognition otherwise contend for the single accelerator |
 
 ## Embeddings & search
 
