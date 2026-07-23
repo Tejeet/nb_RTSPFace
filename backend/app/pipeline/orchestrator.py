@@ -345,6 +345,22 @@ class Pipeline:
             "frame_height": camera["frame_height"],
         }
 
+    def running_backend(self) -> str:
+        """Which inference backend actually loaded: 'cpu' | 'npu' | 'hailo'."""
+        if self.hailo_active:
+            return "hailo"
+        if self.npu_active:
+            return "npu"
+        return "cpu"
+
+    def backend_label(self) -> str:
+        """Human-friendly name of the active processing hardware."""
+        return {
+            "hailo": "Hailo-8",
+            "npu": "NPU",
+            "cpu": "CPU",
+        }[self.running_backend()]
+
     def statistics(self) -> dict[str, object]:
         """Aggregate stats for the dashboard and WebSocket broadcast."""
         pipeline = self.stats.snapshot()
@@ -363,6 +379,8 @@ class Pipeline:
             "faces_saved_session": pipeline["faces_saved_session"],
             "faces_rejected_session": pipeline["faces_rejected_session"],
             "uptime_seconds": pipeline["uptime_seconds"],
+            "inference_backend": self.running_backend(),
+            "inference_label": self.backend_label(),
             "queues": self.queue_sizes(),
             **system,
         }

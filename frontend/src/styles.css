@@ -195,6 +195,21 @@ button { font: inherit; cursor: pointer; }
   border-radius: var(--radius); padding: 10px 12px; word-break: break-word;
 }
 
+/* ---- Backend banner (Statistics) ---------------------------------------------------- */
+.backend-banner {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-radius: var(--radius); margin-bottom: 8px;
+  border: 1px solid var(--border); background: var(--surface); font-size: 14px;
+}
+.backend-banner .backend-temp {
+  margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.backend-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+.backend-hailo { border-color: var(--accent); background: var(--accent-dim); }
+.backend-hailo .backend-dot,
+.backend-npu .backend-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.backend-npu { border-color: var(--accent); background: var(--accent-dim); }
+
 /* ---- Pager ------------------------------------------------------------------------- */
 .pager {
   display: flex; align-items: center; justify-content: center;

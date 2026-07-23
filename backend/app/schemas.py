@@ -114,6 +114,8 @@ class SystemStats(BaseModel):
     temperature_c: float | None
     npu_percent: float | None = None  # only on boards exposing an NPU load node
     accelerator_temperature_c: float | None = None  # Hailo-8 chip temperature
+    inference_backend: str = "cpu"  # cpu | npu | hailo (what actually loaded)
+    inference_label: str = "CPU"  # human-friendly: CPU / NPU / Hailo-8
     uptime_seconds: float
     queues: QueueSizes
 

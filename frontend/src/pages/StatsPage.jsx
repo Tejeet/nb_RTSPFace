@@ -32,6 +32,21 @@ export default function StatsPage() {
         <span className="muted">Updates in real time</span>
       </header>
 
+      {stats.inference_label && (
+        <div className={`backend-banner backend-${stats.inference_backend}`}>
+          <span className="backend-dot" />
+          <span>
+            Processing on <strong>{stats.inference_label}</strong>
+            {stats.inference_backend === "cpu" && " (no accelerator active)"}
+          </span>
+          {stats.accelerator_temperature_c != null && (
+            <span className="backend-temp">
+              {stats.accelerator_temperature_c.toFixed(1)} °C
+            </span>
+          )}
+        </div>
+      )}
+
       <h2 className="section-title">Captures</h2>
       <div className="stat-grid">
         <StatCard label="Faces today" value={stats.faces_today} tone="accent" />
