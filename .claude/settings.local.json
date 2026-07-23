@@ -18,7 +18,8 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:api.github.com)",
       "Bash(git fetch *)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(git check-ignore *)"
     ]
   }
 }
