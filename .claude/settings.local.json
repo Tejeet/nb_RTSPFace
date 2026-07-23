@@ -19,7 +19,10 @@
       "WebFetch(domain:api.github.com)",
       "Bash(git fetch *)",
       "WebSearch",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Fix Hailo build: install build-essential for netifaces compile *)",
+      "Bash(git push *)"
     ]
   }
 }
