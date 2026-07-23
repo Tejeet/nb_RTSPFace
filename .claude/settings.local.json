@@ -14,7 +14,9 @@
       "Bash(bash -n scripts/fetchHailoModels.sh)",
       "Bash(venv/bin/python test_scrfd.py)",
       "Bash(venv/bin/python test_hailo_fallback.py)",
-      "Bash(command -v dash)"
+      "Bash(command -v dash)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:api.github.com)"
     ]
   }
 }

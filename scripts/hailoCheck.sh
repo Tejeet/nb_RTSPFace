@@ -69,7 +69,16 @@ HAILO_ADDR=$(lspci | grep -i hailo | awk '{print $1}')
 section "6. Compiled models present?"
 ls -lh models/models/hailo/*.hef 2>/dev/null || echo "no .hef files in models/models/hailo/"
 
-section "7. In-container view"
+section "7. Python ABI of the host HailoRT bindings"
+# The container runs Python 3.12; a compiled _pyhailort .so built for another
+# Python version cannot be reused there. This prints which one you have.
+echo "host python: $(python3 --version 2>&1)"
+find /usr/lib/python3/dist-packages/hailo_platform /usr/lib/python3*/site-packages/hailo_platform \
+     -name "*.so" 2>/dev/null | head -5
+echo "--- available versions in apt ---"
+apt-cache policy python3-hailort 2>/dev/null | head -8
+
+section "8. In-container view"
 docker exec efc-backend python -c \
     "import hailo_platform, os; print('HailoRT OK', hailo_platform.__version__); print('/dev/hailo0:', os.path.exists('/dev/hailo0'))" 2>&1 \
     | head -5 || echo "(container not running, or HailoRT not installed inside it)"

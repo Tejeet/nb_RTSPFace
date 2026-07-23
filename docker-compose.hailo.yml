@@ -1,0 +1,9 @@
+# Hailo-8 overlay — merged on top of docker-compose.yml only on hosts that
+# actually have the accelerator. bitBucketUpdate.sh adds this file
+# automatically when /dev/hailo0 is present, so the base compose stays
+# portable to boards without a Hailo (which would fail to start if the
+# device were mapped unconditionally).
+services:
+  backend:
+    devices:
+      - /dev/hailo0:/dev/hailo0

@@ -46,6 +46,13 @@ else
 fi
 echo "==> Using: $COMPOSE"
 
+# Auto-attach the Hailo overlay only on hosts that actually have the device,
+# so the same repo deploys unchanged to boards without a Hailo-8.
+if [ -e /dev/hailo0 ]; then
+    COMPOSE="$COMPOSE -f docker-compose.yml -f docker-compose.hailo.yml"
+    echo "==> /dev/hailo0 detected — mapping the Hailo-8 into the backend container"
+fi
+
 echo "==> Current version: $(git log --oneline -1)"
 
 echo "==> Pulling latest code from origin/master..."
@@ -95,13 +102,24 @@ fi
 # ---- Get images: pull the CI-built image for this exact commit, ----
 # ---- build locally only when it isn't published (yet).          ----
 export IMAGE_TAG="$(git rev-parse HEAD)"
-echo "==> Looking for prebuilt images tagged $(git rev-parse --short HEAD)..."
-if $COMPOSE pull backend frontend; then
-    echo "==> Prebuilt images pulled from GHCR — no local build needed."
+
+# The HailoRT wheel is licensed and gitignored, so the CI image can never
+# contain it. When a wheel is present locally the image MUST be built here,
+# or the pulled image would silently lack HailoRT.
+if ls backend/vendor/hailort*.whl >/dev/null 2>&1; then
+    echo "==> HailoRT wheel found in backend/vendor/ — building backend locally"
+    echo "    ($(ls backend/vendor/hailort*.whl | xargs -n1 basename | tr '\n' ' '))"
+    $COMPOSE build backend
+    $COMPOSE pull frontend || $COMPOSE build frontend
 else
-    echo "==> Prebuilt images not available (CI still running, or first push)."
-    echo "==> Building locally instead..."
-    $COMPOSE build backend frontend
+    echo "==> Looking for prebuilt images tagged $(git rev-parse --short HEAD)..."
+    if $COMPOSE pull backend frontend; then
+        echo "==> Prebuilt images pulled from GHCR — no local build needed."
+    else
+        echo "==> Prebuilt images not available (CI still running, or first push)."
+        echo "==> Building locally instead..."
+        $COMPOSE build backend frontend
+    fi
 fi
 
 echo "==> Restarting stack with new images..."
