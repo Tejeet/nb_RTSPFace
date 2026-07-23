@@ -29,9 +29,16 @@ RUN pip install --no-cache-dir -r requirements.txt \
 # build works with an empty vendor/ — Hailo mode then reports "HailoRT missing"
 # and the app runs on CPU.
 COPY vendor/ ./vendor/
+# HailoRT pulls in netifaces, which has no aarch64 wheel and compiles from
+# source — so gcc must be present for this step. Install build-essential,
+# build the wheel, then purge it in the SAME layer so the compiler never
+# bloats the final image.
 RUN if ls vendor/hailort*.whl >/dev/null 2>&1; then \
         echo "Installing HailoRT from vendor/" && \
-        pip install --no-cache-dir vendor/hailort*.whl; \
+        apt-get update && apt-get install -y --no-install-recommends build-essential && \
+        pip install --no-cache-dir vendor/hailort*.whl && \
+        apt-get purge -y build-essential && apt-get autoremove -y && \
+        rm -rf /var/lib/apt/lists/*; \
     else \
         echo "No HailoRT wheel in vendor/ — Hailo backend will be unavailable"; \
     fi
