@@ -99,27 +99,24 @@ else
     echo "==> Models already present in ${MODEL_DIR} — skipping download."
 fi
 
-# ---- Get images: pull the CI-built image for this exact commit, ----
-# ---- build locally only when it isn't published (yet).          ----
+# ---- Get images: pull the CI-built image for this exact commit. ----
+# GitHub Actions builds and publishes both images (with the committed HailoRT
+# wheel baked in) to GHCR on every push. We pull that image rather than
+# rebuild on the Pi. Push, wait for the green check on GitHub, then run this.
 export IMAGE_TAG="$(git rev-parse HEAD)"
-
-# The HailoRT wheel is licensed and gitignored, so the CI image can never
-# contain it. When a wheel is present locally the image MUST be built here,
-# or the pulled image would silently lack HailoRT.
-if ls backend/vendor/hailort*.whl >/dev/null 2>&1; then
-    echo "==> HailoRT wheel found in backend/vendor/ — building backend locally"
-    echo "    ($(ls backend/vendor/hailort*.whl | xargs -n1 basename | tr '\n' ' '))"
-    $COMPOSE build backend
-    $COMPOSE pull frontend || $COMPOSE build frontend
+echo "==> Pulling CI-built images for $(git rev-parse --short HEAD) from GHCR..."
+if $COMPOSE pull backend frontend; then
+    echo "==> Pulled prebuilt images — no local build needed."
 else
-    echo "==> Looking for prebuilt images tagged $(git rev-parse --short HEAD)..."
-    if $COMPOSE pull backend frontend; then
-        echo "==> Prebuilt images pulled from GHCR — no local build needed."
-    else
-        echo "==> Prebuilt images not available (CI still running, or first push)."
-        echo "==> Building locally instead..."
-        $COMPOSE build backend frontend
-    fi
+    echo ""
+    echo "!! Could not pull images for this commit. Usual causes:"
+    echo "   - CI hasn't finished yet: wait for the green check on the GitHub"
+    echo "     Actions tab, then re-run this script."
+    echo "   - GHCR packages are private: make nb_rtspface-backend / -frontend"
+    echo "     public (GitHub → Packages → Package settings), or 'docker login ghcr.io'."
+    echo ""
+    echo "==> Falling back to a local build for now..."
+    $COMPOSE build backend frontend
 fi
 
 echo "==> Restarting stack with new images..."
