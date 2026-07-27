@@ -11,7 +11,14 @@ function formatTime(iso) {
 export default function FaceCard({ face, similarity }) {
   return (
     <Link to={`/faces/${face.id}`} className="face-card">
-      <img src={face.thumbnail_url} alt={`Face ${face.id}`} loading="lazy" />
+      <div className="face-card-thumb">
+        <img src={face.thumbnail_url} alt={`Face ${face.id}`} loading="lazy" />
+        {face.person_name ? (
+          <span className="name-tag name-known">{face.person_name}</span>
+        ) : (
+          <span className="name-tag name-unknown">Unknown</span>
+        )}
+      </div>
       <div className="face-card-body">
         <div className="face-card-row">
           <span className="face-time">{formatTime(face.captured_at)}</span>

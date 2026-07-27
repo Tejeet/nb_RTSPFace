@@ -27,6 +27,9 @@ class FaceSummary(BaseModel):
     quality_score: float
     detection_confidence: float
     is_possible_duplicate: int
+    person_id: int | None = None
+    person_name: str | None = None
+    recognition_similarity: float | None = None
     image_url: str
     thumbnail_url: str
 
@@ -159,6 +162,32 @@ class InferenceUpdate(BaseModel):
     """Settings page payload."""
 
     inference_backend: str
+
+
+class PersonSummary(BaseModel):
+    """An enrolled person."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    employee_id: str
+    created_at: datetime
+    photo_url: str
+
+
+class PersonListResponse(BaseModel):
+    """All enrolled persons."""
+
+    items: list[PersonSummary]
+    total: int
+
+
+class EnrollResponse(BaseModel):
+    """Result of enrolling a person from an uploaded photo."""
+
+    person: PersonSummary
+    message: str
 
 
 class ZoneConfig(BaseModel):

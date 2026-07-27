@@ -14,6 +14,9 @@ from app.db.models import Base
 # via lightweight ALTERs at startup (idempotent).
 _SCHEMA_ADDITIONS: tuple[tuple[str, str, str], ...] = (
     ("faces", "frame_path", "TEXT"),
+    ("faces", "person_id", "INTEGER"),
+    ("faces", "person_name", "TEXT"),
+    ("faces", "recognition_similarity", "REAL"),
 )
 
 

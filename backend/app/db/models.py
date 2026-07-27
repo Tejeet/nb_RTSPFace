@@ -65,12 +65,31 @@ class Face(Base):
     embedding_model: Mapped[str | None] = mapped_column(String(64), nullable=True)
     is_possible_duplicate: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
+    # Recognition against enrolled persons (nullable = unknown face).
+    person_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    person_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    recognition_similarity: Mapped[float | None] = mapped_column(Float, nullable=True)
+
     camera: Mapped[Camera] = relationship(back_populates="faces")
 
     __table_args__ = (
         Index("ix_faces_camera_captured", "camera_id", "captured_at"),
         Index("ix_faces_track", "camera_id", "track_id"),
     )
+
+
+class Person(Base):
+    """An enrolled person: a known identity to recognise captured faces against."""
+
+    __tablename__ = "persons"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    employee_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow, nullable=False)
+
+    photo_path: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding_path: Mapped[str] = mapped_column(Text, nullable=False)
 
 
 class DuplicateLink(Base):

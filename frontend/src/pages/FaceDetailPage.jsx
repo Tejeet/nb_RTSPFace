@@ -27,6 +27,10 @@ export default function FaceDetailPage() {
   if (!face) return <p className="muted">Loading…</p>;
 
   const rows = [
+    ["Person", face.person_name
+      ? `${face.person_name}${face.recognition_similarity != null
+          ? ` (${(face.recognition_similarity * 100).toFixed(1)}%)` : ""}`
+      : "Unknown"],
     ["Captured", formatDateTime(face.captured_at)],
     ["Camera", face.camera_name],
     ["Track ID", face.track_id],

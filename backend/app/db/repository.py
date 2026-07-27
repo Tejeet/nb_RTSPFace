@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 
-from app.db.models import Camera, DuplicateLink, Face
+from app.db.models import Camera, DuplicateLink, Face, Person
 from app.db.session import DatabaseManager
 
 
@@ -94,6 +94,44 @@ class FaceRepository:
                 session.delete(link)
             session.delete(face)
             return face
+
+    # -- Persons (enrollment) ------------------------------------------------
+
+    def insert_person(self, person: Person) -> Person:
+        """Persist a new enrolled person and return it with its id."""
+        with self._db.session() as session:
+            session.add(person)
+            session.flush()
+            session.refresh(person)
+            return person
+
+    def get_person(self, person_id: int) -> Person | None:
+        """Fetch one person by primary key."""
+        with self._db.session() as session:
+            return session.get(Person, person_id)
+
+    def get_person_by_employee_id(self, employee_id: str) -> Person | None:
+        """Fetch a person by their (unique) employee id."""
+        with self._db.session() as session:
+            return session.scalar(select(Person).where(Person.employee_id == employee_id))
+
+    def list_persons(self) -> list[Person]:
+        """All enrolled persons, newest first."""
+        with self._db.session() as session:
+            return list(session.scalars(select(Person).order_by(Person.created_at.desc())).all())
+
+    def delete_person(self, person_id: int) -> Person | None:
+        """Delete an enrolled person; clears the label from their tagged faces."""
+        with self._db.session() as session:
+            person = session.get(Person, person_id)
+            if person is None:
+                return None
+            for face in session.scalars(select(Face).where(Face.person_id == person_id)):
+                face.person_id = None
+                face.person_name = None
+                face.recognition_similarity = None
+            session.delete(person)
+            return person
 
     # -- Duplicates ----------------------------------------------------------
 

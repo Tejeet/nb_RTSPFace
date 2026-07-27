@@ -76,6 +76,14 @@ class Settings(BaseSettings):
     duplicate_threshold: float = Field(default=0.92, ge=0.0, le=1.0, alias="DUPLICATE_THRESHOLD")
     faiss_save_interval: float = Field(default=60.0, gt=0, alias="FAISS_SAVE_INTERVAL")
 
+    # -- Recognition (enrolled persons) -----------------------------------
+    # Cosine similarity above which a captured face is labelled with an
+    # enrolled person. ArcFace same-person similarity is typically 0.4-0.7;
+    # raise to reduce false matches, lower to catch harder angles.
+    recognition_threshold: float = Field(
+        default=0.45, ge=0.0, le=1.0, alias="RECOGNITION_THRESHOLD"
+    )
+
     # -- Storage ------------------------------------------------------------
     storage_root: Path = Field(default=Path("/app/storage"), alias="STORAGE_ROOT")
 
@@ -105,6 +113,14 @@ class Settings(BaseSettings):
     @property
     def frames_dir(self) -> Path:
         return self.storage_root / "frames"
+
+    @property
+    def persons_dir(self) -> Path:
+        return self.storage_root / "persons"
+
+    @property
+    def persons_faiss_path(self) -> Path:
+        return self.database_dir / "persons.faiss"
 
     @property
     def hailo_models_dir(self) -> Path:
@@ -161,6 +177,7 @@ class Settings(BaseSettings):
         for path in (
             self.faces_dir,
             self.frames_dir,
+            self.persons_dir,
             self.embeddings_dir,
             self.database_dir,
             self.logs_dir,

@@ -23,6 +23,15 @@ export const api = {
     form.append("file", file);
     return request(`/api/search?top_k=${topK}`, { method: "POST", body: form });
   },
+  listPersons: () => request("/api/persons"),
+  enrollPerson: (name, employeeId, file) => {
+    const form = new FormData();
+    form.append("name", name);
+    form.append("employee_id", employeeId);
+    form.append("file", file);
+    return request("/api/persons", { method: "POST", body: form });
+  },
+  deletePerson: (id) => request(`/api/persons/${id}`, { method: "DELETE" }),
   getInferenceSettings: () => request("/api/settings/inference"),
   setInferenceSettings: (backend) =>
     request("/api/settings/inference", {

@@ -13,7 +13,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
-from app.api import faces, search, settings as settings_api, stream, system, ws, zone
+from app.api import (
+    faces,
+    persons,
+    search,
+    settings as settings_api,
+    stream,
+    system,
+    ws,
+    zone,
+)
 from app.config import get_settings
 from app.logging_setup import get_logger, setup_logging
 from app.pipeline.orchestrator import Pipeline
@@ -55,6 +64,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(faces.router)
+    app.include_router(persons.router)
     app.include_router(search.router)
     app.include_router(system.router)
     app.include_router(stream.router)

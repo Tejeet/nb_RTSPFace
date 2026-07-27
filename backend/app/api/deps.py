@@ -23,6 +23,9 @@ def face_to_summary(face: Face) -> FaceSummary:
         quality_score=face.quality_score,
         detection_confidence=face.detection_confidence,
         is_possible_duplicate=face.is_possible_duplicate,
+        person_id=face.person_id,
+        person_name=face.person_name,
+        recognition_similarity=face.recognition_similarity,
         image_url=f"/api/faces/{face.id}/image",
         thumbnail_url=f"/api/faces/{face.id}/thumbnail",
     )

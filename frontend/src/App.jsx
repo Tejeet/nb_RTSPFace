@@ -6,10 +6,12 @@ import FaceDetailPage from "./pages/FaceDetailPage.jsx";
 import SearchPage from "./pages/SearchPage.jsx";
 import StatsPage from "./pages/StatsPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
+import EnrollPage from "./pages/EnrollPage.jsx";
 
 const NAV = [
   { to: "/", label: "Live View", icon: "📹" },
   { to: "/recent", label: "Recent Captures", icon: "🧑" },
+  { to: "/enroll", label: "Enroll", icon: "🪪" },
   { to: "/search", label: "Search", icon: "🔍" },
   { to: "/stats", label: "Statistics", icon: "📊" },
   { to: "/settings", label: "Settings", icon: "⚙️" },
@@ -51,6 +53,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<LivePage />} />
           <Route path="/recent" element={<RecentPage />} />
+          <Route path="/enroll" element={<EnrollPage />} />
           <Route path="/faces/:id" element={<FaceDetailPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/stats" element={<StatsPage />} />

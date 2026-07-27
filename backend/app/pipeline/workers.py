@@ -229,6 +229,7 @@ class StorageWorker(threading.Thread):
         cropper: FaceCropper,
         repository: FaceRepository,
         vector_store,  # VectorStore; untyped to avoid import cycle in tooling
+        person_manager,  # PersonManager; untyped for the same reason
         event_bus: EventBus,
         stats: StatsCollector,
         camera_id: int,
@@ -239,6 +240,7 @@ class StorageWorker(threading.Thread):
         self._cropper = cropper
         self._repo = repository
         self._vectors = vector_store
+        self._persons = person_manager
         self._events = event_bus
         self._stats = stats
         self._camera_id = camera_id
@@ -280,6 +282,11 @@ class StorageWorker(threading.Thread):
             if sim >= self._settings.duplicate_threshold
         ]
 
+        # Recognition against enrolled persons (None = unknown).
+        recognized = self._persons.recognize(job.embedding)
+        person = self._repo.get_person(recognized.person_id) if recognized else None
+        person_name = person.name if person else None
+
         x, y, w, h = capture.bbox
         face = self._repo.insert_face(
             Face(
@@ -299,6 +306,9 @@ class StorageWorker(threading.Thread):
                 file_size_bytes=saved.file_size_bytes,
                 embedding_model=self._settings.embedding_model,
                 is_possible_duplicate=1 if duplicates else 0,
+                person_id=recognized.person_id if recognized else None,
+                person_name=person_name,
+                recognition_similarity=recognized.similarity if recognized else None,
             )
         )
 
@@ -308,8 +318,9 @@ class StorageWorker(threading.Thread):
         self._vectors.add(face.id, job.embedding)
         self._stats.record_face_saved()
         logger.info(
-            "Face saved: id=%d uuid=%s track=%d duplicates=%d",
+            "Face saved: id=%d uuid=%s track=%d duplicates=%d person=%s",
             face.id, saved.face_uuid, capture.track_id, len(duplicates),
+            person_name or "unknown",
         )
 
         self._events.publish(
@@ -322,6 +333,9 @@ class StorageWorker(threading.Thread):
                 "quality_score": face.quality_score,
                 "detection_confidence": face.detection_confidence,
                 "is_possible_duplicate": face.is_possible_duplicate,
+                "person_id": face.person_id,
+                "person_name": face.person_name,
+                "recognition_similarity": face.recognition_similarity,
                 "camera_id": self._camera_id,
                 "thumbnail_url": f"/api/faces/{face.id}/thumbnail",
                 "image_url": f"/api/faces/{face.id}/image",

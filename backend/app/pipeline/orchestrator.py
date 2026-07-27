@@ -16,6 +16,7 @@ from app.logging_setup import get_logger
 from app.pipeline.camera import CameraReader, FramePacket
 from app.pipeline.cropper import FaceCropper
 from app.pipeline.detector import FaceModels, npu_runtime_available, resolve_providers
+from app.pipeline.enrollment import PersonManager
 from app.pipeline.events import EventBus
 from app.pipeline.health import HealthMonitor
 from app.pipeline.live import LiveFrameBuffer
@@ -61,6 +62,14 @@ class Pipeline:
         self.vector_store = VectorStore(
             index_path=settings.faiss_index_path,
             dim=self.models.embedding_dim,
+            save_interval=settings.faiss_save_interval,
+        )
+
+        # Enrolled-person recognition (separate index from captures).
+        self.person_manager = PersonManager(
+            index_path=settings.persons_faiss_path,
+            dim=self.models.embedding_dim,
+            threshold=settings.recognition_threshold,
             save_interval=settings.faiss_save_interval,
         )
 
@@ -138,6 +147,7 @@ class Pipeline:
             cropper=self.cropper,
             repository=self.repository,
             vector_store=self.vector_store,
+            person_manager=self.person_manager,
             event_bus=self.event_bus,
             stats=self.stats,
             camera_id=self.camera_id,
@@ -173,6 +183,7 @@ class Pipeline:
         self.storage_worker.join(timeout=10)
         self.camera.join(timeout=5)
         self.vector_store.save()
+        self.person_manager.save()
         if hasattr(self.models, "close"):
             self.models.close()  # release the accelerator, if one is in use
         self.db.dispose()
