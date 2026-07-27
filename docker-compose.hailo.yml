@@ -3,7 +3,21 @@
 # automatically when /dev/hailo0 is present, so the base compose stays
 # portable to boards without a Hailo (which would fail to start if the
 # device were mapped unconditionally).
+#
+# The pip HailoRT wheel ships only the Python bindings; they link against the
+# native libhailort.so, which the host already has from `apt install hailo-all`.
+# We mount that library in and point the loader at it, so the image stays free
+# of the licensed .so and always matches the host's HailoRT version.
+#
+# IMPORTANT: the mounted library version MUST match the wheel baked into the
+# image. Host here is 4.23.0 (see: ls /usr/lib/libhailort.so.*), so the wheel
+# in backend/vendor/ must also be 4.23.0. If you upgrade HailoRT on the host,
+# update this path and the wheel together.
 services:
   backend:
     devices:
       - /dev/hailo0:/dev/hailo0
+    volumes:
+      - /usr/lib/libhailort.so.4.23.0:/opt/hailo/libhailort.so.4.23.0:ro
+    environment:
+      - LD_LIBRARY_PATH=/opt/hailo

@@ -23,7 +23,9 @@
       "Bash(git add *)",
       "Bash(git commit -m 'Fix Hailo build: install build-essential for netifaces compile *)",
       "Bash(git push *)",
-      "Bash(git commit -q -m 'Pi pulls CI image instead of building locally *)"
+      "Bash(git commit -q -m 'Pi pulls CI image instead of building locally *)",
+      "Bash(git commit -q -m 'Mount host libhailort.so into container; surface real Hailo import error *)",
+      "Bash(git ls-remote *)"
     ]
   }
 }

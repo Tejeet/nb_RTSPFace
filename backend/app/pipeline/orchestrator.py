@@ -213,14 +213,14 @@ class Pipeline:
             from app.pipeline.hailo_models import HailoFaceModels
             from app.pipeline.hailo_runtime import (
                 hailo_device_present,
-                hailo_runtime_installed,
+                hailo_import_error,
             )
 
-            if not hailo_runtime_installed():
-                raise RuntimeError(
-                    "HailoRT Python package (hailo_platform) is not installed in this "
-                    "container — see docs/DEPLOYMENT.md 'Hailo-8 acceleration'"
-                )
+            import_error = hailo_import_error()
+            if import_error is not None:
+                # Surface the real reason (missing package vs missing/mismatched
+                # native libhailort.so) so the Settings page is actionable.
+                raise RuntimeError(f"{import_error} — see docs/DEPLOYMENT.md")
             if not hailo_device_present():
                 raise RuntimeError(
                     "/dev/hailo0 not found — load the hailo_pci driver on the host and "

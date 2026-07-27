@@ -23,13 +23,26 @@ logger = get_logger("pipeline.hailo")
 HAILO_DEVICE_NODE = Path("/dev/hailo0")
 
 
-def hailo_runtime_installed() -> bool:
-    """True when the HailoRT Python package is importable in this container."""
+def hailo_import_error() -> str | None:
+    """None if HailoRT imports cleanly, else the real error message.
+
+    Distinguishes 'package not installed' from 'installed but native
+    libhailort.so is missing/mismatched' — the latter shows up here verbatim
+    (e.g. 'libhailort.so.4.23.0: cannot open shared object file'), so the
+    Settings page can display the actual cause instead of a generic message.
+    """
     try:
         import hailo_platform  # noqa: F401
-    except Exception:
-        return False
-    return True
+    except ModuleNotFoundError:
+        return "HailoRT Python package (hailo_platform) is not installed"
+    except Exception as error:  # noqa: BLE001 - surface the real reason
+        return f"HailoRT import failed: {error}"
+    return None
+
+
+def hailo_runtime_installed() -> bool:
+    """True when the HailoRT Python package is fully importable."""
+    return hailo_import_error() is None
 
 
 def hailo_device_present() -> bool:
