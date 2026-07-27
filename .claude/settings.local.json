@@ -27,7 +27,8 @@
       "Bash(git commit -q -m 'Mount host libhailort.so into container; surface real Hailo import error *)",
       "Bash(git ls-remote *)",
       "Bash(git ls-tree *)",
-      "Bash(python3 -m compileall -q backend/app/pipeline/hailo_models.py)"
+      "Bash(python3 -m compileall -q backend/app/pipeline/hailo_models.py)",
+      "Bash(venv/bin/python test_zone.py)"
     ]
   }
 }

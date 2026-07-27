@@ -11,11 +11,11 @@ async function request(path, options = {}) {
 
 export const api = {
   listCameras: () => request("/api/cameras"),
-  addCamera: (name, rtspUrl) =>
+  addCamera: (name, rtspUrl, cameraId = null) =>
     request("/api/cameras", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, rtsp_url: rtspUrl }),
+      body: JSON.stringify({ name, rtsp_url: rtspUrl, camera_id: cameraId }),
     }),
   deleteCamera: (id) => request(`/api/cameras/${id}`, { method: "DELETE" }),
   liveStatus: (cameraId) =>
@@ -54,12 +54,16 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ inference_backend: backend }),
     }),
-  getZone: () => request("/api/zone"),
-  setZone: (points) =>
-    request("/api/zone", {
+  getZone: (cameraId) =>
+    request(`/api/zone${cameraId != null ? `?camera_id=${cameraId}` : ""}`),
+  setZone: (points, cameraId) =>
+    request(`/api/zone${cameraId != null ? `?camera_id=${cameraId}` : ""}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ points }),
     }),
-  clearZone: () => request("/api/zone", { method: "DELETE" }),
+  clearZone: (cameraId) =>
+    request(`/api/zone${cameraId != null ? `?camera_id=${cameraId}` : ""}`, {
+      method: "DELETE",
+    }),
 };

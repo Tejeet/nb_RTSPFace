@@ -9,7 +9,7 @@ import { api } from "../lib/api.js";
  * into the stream itself (orange), so this overlay only renders the
  * in-progress polygon while editing.
  */
-export default function ZoneEditor({ imgRef, containerRef }) {
+export default function ZoneEditor({ imgRef, containerRef, cameraId }) {
   const [editing, setEditing] = useState(false);
   const [points, setPoints] = useState([]);
   const [zoneActive, setZoneActive] = useState(false);
@@ -18,9 +18,13 @@ export default function ZoneEditor({ imgRef, containerRef }) {
   const [rect, setRect] = useState(null);
   const svgRef = useRef(null);
 
+  // Reload the zone status whenever the selected camera changes.
   useEffect(() => {
-    api.getZone().then((zone) => setZoneActive(zone.enabled)).catch(() => {});
-  }, []);
+    setEditing(false);
+    setPoints([]);
+    if (cameraId == null) return;
+    api.getZone(cameraId).then((zone) => setZoneActive(zone.enabled)).catch(() => {});
+  }, [cameraId]);
 
   // Compute where the (object-fit: contain) video actually renders inside
   // its container, so clicks map to true image coordinates.
@@ -61,7 +65,7 @@ export default function ZoneEditor({ imgRef, containerRef }) {
     setBusy(true);
     setError(null);
     try {
-      await api.setZone(points);
+      await api.setZone(points, cameraId);
       setZoneActive(true);
       setEditing(false);
       setPoints([]);
@@ -76,7 +80,7 @@ export default function ZoneEditor({ imgRef, containerRef }) {
     setBusy(true);
     setError(null);
     try {
-      await api.clearZone();
+      await api.clearZone(cameraId);
       setZoneActive(false);
       setEditing(false);
       setPoints([]);

@@ -173,6 +173,7 @@ class CameraCreate(BaseModel):
 
     name: str
     rtsp_url: str
+    camera_id: int | None = None  # optional custom id (else auto-assigned)
 
 
 class CameraSummary(BaseModel):

@@ -32,12 +32,20 @@ class FaceRepository:
                 camera.rtsp_url = rtsp_url
             return camera.id
 
-    def add_camera(self, name: str, rtsp_url: str) -> Camera:
-        """Create a new camera; raises ValueError if the name is taken."""
+    def add_camera(self, name: str, rtsp_url: str, camera_id: int | None = None) -> Camera:
+        """Create a camera. Optional camera_id sets a custom id (else auto).
+
+        Raises ValueError if the name or the requested id is already taken.
+        """
         with self._db.session() as session:
             if session.scalar(select(Camera).where(Camera.name == name)) is not None:
                 raise ValueError(f"A camera named '{name}' already exists")
-            camera = Camera(name=name, rtsp_url=rtsp_url)
+            if camera_id is not None:
+                if session.get(Camera, camera_id) is not None:
+                    raise ValueError(f"Camera id {camera_id} is already in use")
+                camera = Camera(id=camera_id, name=name, rtsp_url=rtsp_url)
+            else:
+                camera = Camera(name=name, rtsp_url=rtsp_url)
             session.add(camera)
             session.flush()
             session.refresh(camera)
@@ -171,9 +179,12 @@ class FaceRepository:
     # -- Bulk purge ----------------------------------------------------------
 
     def purge_faces(
-        self, since: datetime | None = None, until: datetime | None = None
+        self,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        camera_id: int | None = None,
     ) -> list[dict[str, object]]:
-        """Delete captured faces in the given time window (both None = all).
+        """Delete captured faces matching the filters (all None = every face).
 
         Returns the file paths of every deleted face so the caller can remove
         the images and FAISS vectors. Enrolled persons are untouched.
@@ -184,6 +195,8 @@ class FaceRepository:
                 query = query.where(Face.captured_at >= since)
             if until is not None:
                 query = query.where(Face.captured_at < until)
+            if camera_id is not None:
+                query = query.where(Face.camera_id == camera_id)
             faces = list(session.scalars(query).all())
             if not faces:
                 return []

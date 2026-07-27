@@ -5,6 +5,8 @@ Adding or removing a camera takes effect on the next backend restart
 (consistent with the inference-backend and zone settings).
 """
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.deps import get_pipeline
@@ -57,8 +59,10 @@ def add_camera(
         raise HTTPException(status_code=422, detail="Name and RTSP URL are required")
     if not rtsp_url.lower().startswith("rtsp://"):
         raise HTTPException(status_code=422, detail="RTSP URL must start with rtsp://")
+    if body.camera_id is not None and body.camera_id < 1:
+        raise HTTPException(status_code=422, detail="Camera id must be a positive integer")
     try:
-        camera = pipeline.repository.add_camera(name, rtsp_url)
+        camera = pipeline.repository.add_camera(name, rtsp_url, camera_id=body.camera_id)
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     logger.info("Camera added: id=%d name=%s (restart to start streaming)", camera.id, name)
@@ -67,11 +71,28 @@ def add_camera(
 
 @router.delete("/cameras/{camera_id}", response_model=MessageResponse)
 def delete_camera(camera_id: int, pipeline: Pipeline = Depends(get_pipeline)) -> MessageResponse:
-    """Delete a camera. Its captured faces are kept; takes effect after restart."""
-    if pipeline.repository.count_cameras() <= 1:
-        raise HTTPException(status_code=409, detail="Cannot delete the only camera")
-    camera = pipeline.repository.delete_camera(camera_id)
+    """Delete a camera and its captured faces; takes effect after restart.
+
+    The faces table has a FK to cameras, so a camera's captures must be removed
+    (images, embeddings, index vectors and rows) before the camera row itself.
+    """
+    camera = pipeline.repository.get_camera(camera_id)
     if camera is None:
         raise HTTPException(status_code=404, detail="Camera not found")
-    logger.info("Camera deleted: id=%d name=%s (restart to stop streaming)", camera_id, camera.name)
-    return MessageResponse(message=f"Camera '{camera.name}' removed (restart to apply)")
+
+    removed = pipeline.repository.purge_faces(camera_id=camera_id)
+    for item in removed:
+        pipeline.vector_store.remove(int(item["id"]))
+        for key in ("image_path", "thumbnail_path", "embedding_path", "frame_path"):
+            path_str = item.get(key)
+            if path_str:
+                Path(str(path_str)).unlink(missing_ok=True)
+
+    pipeline.repository.delete_camera(camera_id)
+    logger.info("Camera deleted: id=%d name=%s faces=%d", camera_id, camera.name, len(removed))
+    return MessageResponse(
+        message=(
+            f"Camera '{camera.name}' and {len(removed)} capture(s) removed "
+            "— restart the backend to stop its stream"
+        )
+    )

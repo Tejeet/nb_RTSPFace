@@ -96,15 +96,16 @@ class Pipeline:
             output_size=settings.face_crop_size,
             jpeg_quality=settings.jpeg_quality,
         )
-        # Zone precedence: dashboard-saved zone.json overrides the env default.
-        # Shared across cameras (per-camera zones are a future refinement).
-        self.capture_zone = CaptureZone(self._load_zone_points())
-        if self.capture_zone.enabled:
-            logger.info("Capture zone active: %s", self.capture_zone.get_points())
+        # One capture zone per camera (persisted as zone-<camera_id>.json).
+        self.capture_zones: dict[int, CaptureZone] = {}
 
         # One CameraPipeline per configured camera, all feeding embed_queue.
         self.camera_pipelines: dict[int, CameraPipeline] = {}
         for cam in self.repository.list_cameras():
+            zone = CaptureZone(self._load_zone_points(cam.id))
+            self.capture_zones[cam.id] = zone
+            if zone.enabled:
+                logger.info("Camera %d capture zone: %s", cam.id, zone.get_points())
             self.camera_pipelines[cam.id] = CameraPipeline(
                 camera_id=cam.id,
                 camera_name=cam.name,
@@ -114,7 +115,7 @@ class Pipeline:
                 cropper=self.cropper,
                 quality=self.quality,
                 embed_queue=self.embed_queue,
-                zone=self.capture_zone,
+                zone=zone,
             )
         logger.info("Configured %d camera(s): %s",
                     len(self.camera_pipelines),
@@ -302,30 +303,43 @@ class Pipeline:
             raise ValueError("inference_backend must be 'cpu', 'npu' or 'hailo'")
         self.runtime_settings.set("inference_backend", backend)
 
-    # -- capture zone ----------------------------------------------------------
+    # -- capture zone (per camera) ---------------------------------------------
 
-    @property
-    def _zone_file(self):  # noqa: ANN202 (Path; kept terse)
-        return self.settings.database_dir / "zone.json"
+    def _zone_file(self, camera_id: int):  # noqa: ANN202 (Path; kept terse)
+        return self.settings.database_dir / f"zone-{camera_id}.json"
 
-    def _load_zone_points(self) -> list[tuple[float, float]]:
-        """Dashboard-saved zone if present, otherwise the CAPTURE_ZONE env value."""
-        if self._zone_file.exists():
+    def _load_zone_points(self, camera_id: int) -> list[tuple[float, float]]:
+        """Saved per-camera zone if present, else the CAPTURE_ZONE env default."""
+        path = self._zone_file(camera_id)
+        # Migrate the pre-multicamera single zone.json onto the first camera.
+        legacy = self.settings.database_dir / "zone.json"
+        if not path.exists() and legacy.exists():
+            path = legacy
+        if path.exists():
             try:
-                data = json.loads(self._zone_file.read_text())
+                data = json.loads(path.read_text())
                 return CaptureZone.validate_points(
                     [(float(p[0]), float(p[1])) for p in data.get("points", [])]
                 )
             except (ValueError, KeyError, IndexError, json.JSONDecodeError):
-                logger.exception("Invalid zone.json; falling back to CAPTURE_ZONE env")
+                logger.exception("Invalid zone file %s; falling back to env", path)
         return CaptureZone.parse(self.settings.capture_zone)
 
-    def set_capture_zone(self, points: list[tuple[float, float]]) -> None:
-        """Apply and persist a new capture zone (empty list disables it)."""
+    def get_capture_zone(self, camera_id: int | None) -> CaptureZone | None:
+        """The zone for a camera (first camera when id omitted)."""
+        if camera_id is None:
+            return next(iter(self.capture_zones.values()), None)
+        return self.capture_zones.get(camera_id)
+
+    def set_capture_zone(self, points: list[tuple[float, float]], camera_id: int) -> None:
+        """Apply and persist a camera's capture zone (empty list disables it)."""
+        zone = self.capture_zones.get(camera_id)
+        if zone is None:
+            raise ValueError(f"Unknown camera id {camera_id}")
         validated = CaptureZone.validate_points(points)
-        self.capture_zone.set_points(validated)
-        self._zone_file.write_text(json.dumps({"points": validated}))
-        logger.info("Capture zone updated: %d points", len(validated))
+        zone.set_points(validated)
+        self._zone_file(camera_id).write_text(json.dumps({"points": validated}))
+        logger.info("Camera %d capture zone updated: %d points", camera_id, len(validated))
 
     # -- read views for the API -----------------------------------------------
 

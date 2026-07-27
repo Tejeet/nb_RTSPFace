@@ -94,7 +94,7 @@ export default function LivePage() {
             />
           )
         )}
-        <ZoneEditor imgRef={imgRef} containerRef={containerRef} />
+        <ZoneEditor imgRef={imgRef} containerRef={containerRef} cameraId={activeId} />
       </div>
 
       <h2 className="section-title">Latest captures</h2>

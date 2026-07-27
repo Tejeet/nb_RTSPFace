@@ -5,6 +5,7 @@ export default function CamerasPage() {
   const [cameras, setCameras] = useState([]);
   const [name, setName] = useState("");
   const [rtspUrl, setRtspUrl] = useState("");
+  const [camId, setCamId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
@@ -20,10 +21,11 @@ export default function CamerasPage() {
     setNotice(null);
     setBusy(true);
     try {
-      await api.addCamera(name, rtspUrl);
+      await api.addCamera(name, rtspUrl, camId.trim() ? Number(camId) : null);
       setNotice("Camera added — restart the backend to start streaming it.");
       setName("");
       setRtspUrl("");
+      setCamId("");
       load();
     } catch (e) {
       setError(e.message);
@@ -64,6 +66,15 @@ export default function CamerasPage() {
               onChange={(e) => setRtspUrl(e.target.value)}
               placeholder="rtsp://user:pass@192.168.1.10:554/Streaming/Channels/101"
               required
+            />
+          </label>
+          <label className="field">
+            <span>Camera ID (optional — leave blank to auto-assign)</span>
+            <input
+              value={camId}
+              onChange={(e) => setCamId(e.target.value)}
+              inputMode="numeric"
+              placeholder="e.g. 601"
             />
           </label>
           <button className="button button-primary" disabled={busy}>
