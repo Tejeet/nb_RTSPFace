@@ -1,31 +1,53 @@
-# Vendor wheels (not committed)
+# Vendor wheels — HailoRT
 
-Drop the **HailoRT Python wheel** here to enable the Hailo-8 backend:
+Put **exactly one** HailoRT Python wheel here to enable the Hailo-8 backend:
 
 ```
 backend/vendor/hailort-<version>-cp312-cp312-linux_aarch64.whl
 ```
 
-Where to get it: [Hailo Developer Zone](https://hailo.ai/developer-zone/) →
-Software Downloads → HailoRT → *Python package*. An account is required, which
-is why this cannot be fetched automatically by the build.
+> ⚠️ Keep only ONE `hailort*.whl` in this folder. The Docker build installs
+> `vendor/hailort*.whl` (a glob) — two wheels means two conflicting installs.
 
-Three things must match or the runtime will refuse to load / talk to the device:
+## Required version for THIS deployment: 4.23.0
 
-1. **HailoRT version** — the wheel version must equal the host's installed
-   HailoRT: the native `libhailort.so.<version>` (`ls /usr/lib/libhailort.so.*`)
-   AND the driver/firmware (`hailortcli fw-control identify`). The wheel only
-   ships Python bindings; they dynamically link `libhailort.so.<version>`, which
-   `docker-compose.hailo.yml` mounts in from the host — so if the wheel is 4.24.0
-   but the host lib is 4.23.0, the import fails with
-   `libhailort.so.4.24.0: cannot open shared object file`. Pick the wheel version
-   that matches `/usr/lib/libhailort.so.*` on the host, and update the mount path
-   in `docker-compose.hailo.yml` to the same version.
-2. **Python version** — the container runs Python 3.12, so the wheel must be
-   `cp312` and `linux_aarch64`.
+All four pieces must be the **same** HailoRT version, or `import hailo_platform`
+fails at runtime with `libhailort.so.<version>: cannot open shared object file`:
 
-The Docker build works fine with this directory empty; the Hailo option then
-reports "HailoRT missing" on the Settings page and inference stays on CPU.
+| Piece | Where | Current |
+| --- | --- | --- |
+| PCIe driver + firmware | host, `hailortcli fw-control identify` | 4.23.0 |
+| Native library `libhailort.so` | host, `ls /usr/lib/libhailort.so.*` | 4.23.0 |
+| Python wheel (this folder) | `backend/vendor/` | **must be 4.23.0** |
+| Library mount | `docker-compose.hailo.yml` | 4.23.0 |
 
-`.hef` model files do **not** go here — they belong in `models/models/hailo/`
-on the host (bind-mounted into the container).
+So the correct file here is:
+
+```
+hailort-4.23.0-cp312-cp312-linux_aarch64.whl
+```
+
+The pip wheel ships only the Python bindings; they dynamically link the native
+`libhailort.so.4.23.0`, which `docker-compose.hailo.yml` bind-mounts from the
+host — the image never contains the licensed `.so`.
+
+## Where to get it
+
+[Hailo Developer Zone](https://hailo.ai/developer-zone/) → Software Downloads →
+**HailoRT** → change the "Latest release" filter to **4.23.0** → Architecture
+**ARM64**, OS **Linux**, Python **3.12** → download the `.whl`. An account is
+required, so the build cannot fetch it automatically.
+
+## If you upgrade HailoRT later
+
+Bump all four together: install the new `hailort_<ver>_arm64.deb` +
+`hailort-pcie-driver_<ver>_all.deb` on the host, reboot, then replace the wheel
+here **and** update the mount path in `docker-compose.hailo.yml` to the new
+`libhailort.so.<ver>`.
+
+## Notes
+
+- The build works with this folder empty — Hailo just reports "HailoRT missing"
+  on the Settings page and inference stays on CPU.
+- `.hef` model files do NOT go here — they live in `models/models/hailo/` on the
+  host (bind-mounted into the container).
