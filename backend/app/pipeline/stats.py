@@ -33,14 +33,18 @@ class StatsCollector:
         self.detection_latency = LatencyEma()
         self.embedding_latency = LatencyEma()
         self._processing_fps = 0.0
+        self._faces_in_frame = 0
         self._visible_faces = 0
         self._tracked_faces = 0
         self._faces_saved = 0
         self._faces_rejected = 0
 
-    def record_detection(self, latency_ms: float, visible: int, tracked: int) -> None:
+    def record_detection(
+        self, latency_ms: float, faces_in_frame: int, visible: int, tracked: int
+    ) -> None:
         with self._lock:
             self.detection_latency.record(latency_ms)
+            self._faces_in_frame = faces_in_frame
             self._visible_faces = visible
             self._tracked_faces = tracked
 
@@ -65,6 +69,7 @@ class StatsCollector:
         with self._lock:
             return {
                 "processing_fps": self._processing_fps,
+                "faces_in_frame": self._faces_in_frame,
                 "visible_faces": self._visible_faces,
                 "tracked_faces": self._tracked_faces,
                 "faces_saved_session": self._faces_saved,

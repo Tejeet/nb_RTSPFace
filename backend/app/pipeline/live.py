@@ -39,6 +39,7 @@ class LiveFrameBuffer:
         tracks: list[Track],
         fps: float,
         camera_name: str,
+        faces_in_frame: int | None = None,
     ) -> None:
         """Annotate and encode the frame if enough time has passed (rate-capped)."""
         now = time.monotonic()
@@ -70,7 +71,8 @@ class LiveFrameBuffer:
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA,
             )
 
-        banner = f"{camera_name}  |  {fps:.1f} FPS  |  faces: {len(tracks)}"
+        count = faces_in_frame if faces_in_frame is not None else len(tracks)
+        banner = f"{camera_name}  |  {fps:.1f} FPS  |  people in frame: {count}"
         cv2.putText(
             display, banner, (10, 24),
             cv2.FONT_HERSHEY_SIMPLEX, 0.65, OVERLAY_TEXT, 2, cv2.LINE_AA,

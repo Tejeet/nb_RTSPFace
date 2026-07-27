@@ -59,6 +59,7 @@ export default function StatsPage() {
 
       <h2 className="section-title">Pipeline</h2>
       <div className="stat-grid">
+        <StatCard label="People in frame" value={stats.faces_in_frame ?? 0} tone="accent" />
         <StatCard label="Camera FPS" value={stats.fps?.toFixed(1)} />
         <StatCard label="Processing FPS" value={stats.processing_fps?.toFixed(1)} />
         <StatCard label="Detection latency" value={stats.detection_latency_ms?.toFixed(0)} unit="ms" />

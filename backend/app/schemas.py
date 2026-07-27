@@ -85,6 +85,7 @@ class LiveStatus(BaseModel):
     camera_connected: bool
     camera_name: str
     fps: float
+    faces_in_frame: int = 0
     visible_faces: int
     tracked_faces: int
     frame_width: int
@@ -105,6 +106,7 @@ class SystemStats(BaseModel):
     faces_total: int
     faces_today: int
     faces_last_hour: int
+    faces_in_frame: int = 0
     current_tracks: int
     fps: float
     detection_latency_ms: float

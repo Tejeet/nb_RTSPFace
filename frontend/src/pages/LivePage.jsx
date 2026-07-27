@@ -30,7 +30,7 @@ export default function LivePage() {
               <span className="meta-sep">·</span>
               <span>{status.fps?.toFixed(1)} FPS</span>
               <span className="meta-sep">·</span>
-              <span>{status.visible_faces} visible</span>
+              <span className="people-count">{status.faces_in_frame ?? 0} people in frame</span>
               <span className="meta-sep">·</span>
               <span>{status.tracked_faces} tracked</span>
             </>

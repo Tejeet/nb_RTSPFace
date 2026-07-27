@@ -127,7 +127,11 @@ class DetectionWorker(threading.Thread):
         detections = self._models.detect(packet.frame)
         tracks = self._tracker.update(detections)
         latency_ms = (time.perf_counter() - started) * 1000.0
-        self._stats.record_detection(latency_ms, len(tracks), self._tracker.tracked_count)
+        # faces_in_frame = raw detections this instant (true count of people
+        # visible); visible/tracked are the stable, confirmed track counts.
+        self._stats.record_detection(
+            latency_ms, len(detections), len(tracks), self._tracker.tracked_count
+        )
 
         now = time.time()
         frame_h, frame_w = packet.frame.shape[:2]
@@ -180,7 +184,10 @@ class DetectionWorker(threading.Thread):
                 logger.warning("Embed queue full; capture for track %d dropped",
                                track.track_id)
 
-        self._live.update(packet.frame, tracks, self._camera_fps(), self._settings.camera_name)
+        self._live.update(
+            packet.frame, tracks, self._camera_fps(), self._settings.camera_name,
+            faces_in_frame=len(detections),
+        )
 
 
 class EmbeddingWorker(threading.Thread):
