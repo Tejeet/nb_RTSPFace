@@ -162,6 +162,37 @@ Hailo is actually in use, and — if it fell back — the exact reason. A missin
 driver or HEF never crashes the container; it logs the cause and runs on CPU.
 Statistics gains a Hailo-8 chip-temperature tile once the accelerator is live.
 
+## USB and Raspberry Pi cameras
+
+Cameras are added from the dashboard (Cameras page). Besides RTSP, a camera's
+source can be a local device.
+
+### USB webcam
+1. Plug it in; `ls /dev/video*` on the host shows the node(s).
+2. In `docker-compose.yml`, uncomment the matching `/dev/videoN` under the
+   backend `devices:` list and the `group_add: [video]` line, then
+   `docker compose up -d backend`.
+3. On the Cameras page choose **USB / CSI device** — detected devices appear in
+   the dropdown (or type `usb:0` / `/dev/video0`). Restart the backend.
+
+No extra install is needed: OpenCV's V4L2 backend and ffmpeg are already in the
+image. The container just needs the device passed through (step 2).
+
+### Raspberry Pi CSI camera (ribbon on the camera port)
+Do **not** try to run libcamera/picamera2 inside the container — on Bookworm/
+Trixie it needs a fragile stack of media devices and udev. Bridge it to RTSP on
+the **host** instead and add that URL as a normal camera:
+
+```bash
+# On the Pi host (rpicam-vid ships with Raspberry Pi OS):
+rpicam-vid -t 0 --inline --width 1280 --height 720 --framerate 15 \
+  --codec h264 -o - | \
+  ffmpeg -re -i - -c copy -f rtsp rtsp://127.0.0.1:8554/csi
+```
+Run an RTSP server (e.g. `mediamtx`) on the host to receive it, then add a
+camera with source `rtsp://<pi-ip>:8554/csi`. This reuses the existing RTSP
+path and is far more robust than CSI-in-Docker.
+
 ## NPU acceleration (Radxa Cubie A7Z and similar)
 
 The pipeline runs all inference through ONNX Runtime, so hardware acceleration is a

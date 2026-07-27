@@ -11,6 +11,7 @@ async function request(path, options = {}) {
 
 export const api = {
   listCameras: () => request("/api/cameras"),
+  listVideoDevices: () => request("/api/cameras/devices"),
   addCamera: (name, rtspUrl, cameraId = null) =>
     request("/api/cameras", {
       method: "POST",

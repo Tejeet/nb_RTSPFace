@@ -4,7 +4,10 @@ import { api } from "../lib/api.js";
 export default function CamerasPage() {
   const [cameras, setCameras] = useState([]);
   const [name, setName] = useState("");
+  const [sourceType, setSourceType] = useState("rtsp");
   const [rtspUrl, setRtspUrl] = useState("");
+  const [usbSource, setUsbSource] = useState("");
+  const [devices, setDevices] = useState([]);
   const [camId, setCamId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -15,16 +18,31 @@ export default function CamerasPage() {
   }
   useEffect(load, []);
 
+  // Fetch USB/CSI devices when the user switches to the USB source type.
+  useEffect(() => {
+    if (sourceType !== "usb") return;
+    api.listVideoDevices().then((r) => {
+      setDevices(r.items);
+      if (r.items.length && !usbSource) setUsbSource(r.items[0].source);
+    }).catch(() => setDevices([]));
+  }, [sourceType]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function add(event) {
     event.preventDefault();
     setError(null);
     setNotice(null);
+    const source = sourceType === "usb" ? usbSource.trim() : rtspUrl.trim();
+    if (!source) {
+      setError(sourceType === "usb" ? "Choose a USB device." : "Enter an RTSP URL.");
+      return;
+    }
     setBusy(true);
     try {
-      await api.addCamera(name, rtspUrl, camId.trim() ? Number(camId) : null);
+      await api.addCamera(name, source, camId.trim() ? Number(camId) : null);
       setNotice("Camera added — restart the backend to start streaming it.");
       setName("");
       setRtspUrl("");
+      setUsbSource("");
       setCamId("");
       load();
     } catch (e) {
@@ -60,14 +78,57 @@ export default function CamerasPage() {
             <input value={name} onChange={(e) => setName(e.target.value)} required />
           </label>
           <label className="field">
-            <span>RTSP URL</span>
-            <input
-              value={rtspUrl}
-              onChange={(e) => setRtspUrl(e.target.value)}
-              placeholder="rtsp://user:pass@192.168.1.10:554/Streaming/Channels/101"
-              required
-            />
+            <span>Source type</span>
+            <div className="source-toggle">
+              <button
+                type="button"
+                className={`toggle-btn${sourceType === "rtsp" ? " active" : ""}`}
+                onClick={() => setSourceType("rtsp")}
+              >
+                Network (RTSP)
+              </button>
+              <button
+                type="button"
+                className={`toggle-btn${sourceType === "usb" ? " active" : ""}`}
+                onClick={() => setSourceType("usb")}
+              >
+                USB / CSI device
+              </button>
+            </div>
           </label>
+
+          {sourceType === "rtsp" ? (
+            <label className="field">
+              <span>RTSP URL</span>
+              <input
+                value={rtspUrl}
+                onChange={(e) => setRtspUrl(e.target.value)}
+                placeholder="rtsp://user:pass@192.168.1.10:554/Streaming/Channels/101"
+              />
+            </label>
+          ) : (
+            <label className="field">
+              <span>USB / V4L2 device</span>
+              {devices.length > 0 ? (
+                <select value={usbSource} onChange={(e) => setUsbSource(e.target.value)}>
+                  {devices.map((d) => (
+                    <option key={d.path} value={d.source}>{d.path}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={usbSource}
+                  onChange={(e) => setUsbSource(e.target.value)}
+                  placeholder="/dev/video0 or usb:0"
+                />
+              )}
+              <span className="muted" style={{ fontSize: "12px" }}>
+                {devices.length === 0
+                  ? "No devices detected — pass /dev/video* into the container (see docs)."
+                  : `${devices.length} device(s) detected`}
+              </span>
+            </label>
+          )}
           <label className="field">
             <span>Camera ID (optional — leave blank to auto-assign)</span>
             <input

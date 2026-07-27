@@ -84,14 +84,25 @@ class CameraReader(threading.Thread):
     # -- internals -------------------------------------------------------
 
     def _open(self) -> cv2.VideoCapture | None:
-        """Try to open the RTSP stream once."""
-        # OpenCV's FFmpeg backend only accepts demuxer options via this env var,
-        # read at VideoCapture creation time. RTP-over-TCP is essential inside
-        # Docker bridge networks where UDP return traffic is unroutable.
-        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
-            f"rtsp_transport;{self._rtsp_transport}|max_delay;500000"
-        )
-        capture = cv2.VideoCapture(self._rtsp_url, cv2.CAP_FFMPEG)
+        """Open the configured source once (RTSP/HTTP network, or USB/V4L2)."""
+        source = self._rtsp_url
+        lowered = source.lower()
+
+        if lowered.startswith(("rtsp://", "http://", "https://")):
+            # OpenCV's FFmpeg backend only accepts demuxer options via this env
+            # var, read at VideoCapture creation. RTP-over-TCP is essential in
+            # Docker bridge networks where UDP return traffic is unroutable.
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
+                f"rtsp_transport;{self._rtsp_transport}|max_delay;500000"
+            )
+            capture = cv2.VideoCapture(source, cv2.CAP_FFMPEG)
+        else:
+            # USB / CSI-via-V4L2 device: "usb:0", "/dev/video0", or a bare index.
+            target: str | int = source[4:] if lowered.startswith("usb:") else source
+            if isinstance(target, str) and target.isdigit():
+                target = int(target)
+            capture = cv2.VideoCapture(target, cv2.CAP_V4L2)
+
         capture.set(cv2.CAP_PROP_BUFFERSIZE, 2)
         if not capture.isOpened():
             capture.release()

@@ -195,6 +195,20 @@ class CameraListResponse(BaseModel):
     total: int
 
 
+class VideoDevice(BaseModel):
+    """A local V4L2 video device detected inside the container."""
+
+    path: str
+    source: str  # value to use as the camera source
+
+
+class VideoDeviceList(BaseModel):
+    """Detected local video devices."""
+
+    items: list[VideoDevice]
+    total: int
+
+
 class PersonSummary(BaseModel):
     """An enrolled person."""
 

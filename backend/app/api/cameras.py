@@ -5,6 +5,7 @@ Adding or removing a camera takes effect on the next backend restart
 (consistent with the inference-backend and zone settings).
 """
 
+from glob import glob
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,11 +18,23 @@ from app.schemas import (
     CameraListResponse,
     CameraSummary,
     MessageResponse,
+    VideoDevice,
+    VideoDeviceList,
 )
 
 logger = get_logger("api.cameras")
 
 router = APIRouter(prefix="/api", tags=["cameras"])
+
+
+def _valid_source(source: str) -> bool:
+    """Accept an RTSP/HTTP URL, a usb:/dev/video device, or a bare index."""
+    lowered = source.lower()
+    if lowered.startswith(("rtsp://", "http://", "https://", "/dev/video")):
+        return True
+    if lowered.startswith("usb:"):
+        return source[4:].strip().isdigit()
+    return source.strip().isdigit()
 
 
 def _to_summary(pipeline: Pipeline, camera) -> CameraSummary:  # noqa: ANN001
@@ -48,6 +61,21 @@ def list_cameras(pipeline: Pipeline = Depends(get_pipeline)) -> CameraListRespon
     )
 
 
+@router.get("/cameras/devices", response_model=VideoDeviceList)
+def list_video_devices() -> VideoDeviceList:
+    """List local V4L2 video devices (USB / CSI) visible inside the container.
+
+    Empty unless the host devices are passed through in docker-compose
+    (`devices: - /dev/video0:/dev/video0`).
+    """
+    devices = []
+    for path in sorted(glob("/dev/video*")):
+        # Even-numbered /dev/videoN are the capture nodes on most webcams;
+        # odd ones are metadata. We list all and let the user pick.
+        devices.append(VideoDevice(path=path, source=path))
+    return VideoDeviceList(items=devices, total=len(devices))
+
+
 @router.post("/cameras", response_model=CameraSummary)
 def add_camera(
     body: CameraCreate, pipeline: Pipeline = Depends(get_pipeline)
@@ -57,8 +85,11 @@ def add_camera(
     rtsp_url = body.rtsp_url.strip()
     if not name or not rtsp_url:
         raise HTTPException(status_code=422, detail="Name and RTSP URL are required")
-    if not rtsp_url.lower().startswith("rtsp://"):
-        raise HTTPException(status_code=422, detail="RTSP URL must start with rtsp://")
+    if not _valid_source(rtsp_url):
+        raise HTTPException(
+            status_code=422,
+            detail="Source must be an rtsp:// URL, a /dev/videoN path, or 'usb:N'",
+        )
     if body.camera_id is not None and body.camera_id < 1:
         raise HTTPException(status_code=422, detail="Camera id must be a positive integer")
     try:

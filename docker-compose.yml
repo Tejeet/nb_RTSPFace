@@ -23,10 +23,14 @@ services:
       # --- Radxa Cubie A7Z / NPU boards: uncomment so the dashboard can read
       # --- NPU utilization from the kernel debug nodes.
       # - /sys/kernel/debug:/sys/kernel/debug:ro
-    # Accelerators: uncomment the line for the hardware actually fitted.
+    # Accelerators & cameras: uncomment the device(s) actually fitted.
     # devices:
     #   - /dev/hailo0:/dev/hailo0     # Hailo-8 PCIe (INFERENCE_BACKEND=hailo)
     #   - /dev/galcore:/dev/galcore   # VeriSilicon NPU (INFERENCE_BACKEND=npu)
+    #   - /dev/video0:/dev/video0     # USB webcam (add a camera with source usb:0)
+    #   - /dev/video1:/dev/video1     # second USB device node if present
+    # group_add:
+    #   - video                        # grant the container the 'video' group for V4L2
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
       interval: 30s
