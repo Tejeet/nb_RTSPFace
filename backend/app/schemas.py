@@ -199,6 +199,20 @@ class ZoneConfig(BaseModel):
     enabled: bool = False
 
 
+class PurgeRequest(BaseModel):
+    """Bulk-delete request for captured history."""
+
+    scope: str  # "all" | "last_hour" | "today" | "older_than_week"
+
+
+class PurgeResponse(BaseModel):
+    """Result of a bulk delete."""
+
+    deleted: int
+    scope: str
+    message: str
+
+
 class MessageResponse(BaseModel):
     """Generic acknowledgement."""
 

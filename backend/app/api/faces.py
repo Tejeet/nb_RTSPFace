@@ -1,6 +1,6 @@
-"""Face listing, detail, images and deletion endpoints."""
+"""Face listing, detail, images, deletion and bulk-purge endpoints."""
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -15,6 +15,8 @@ from app.schemas import (
     FaceListResponse,
     FaceSummary,
     MessageResponse,
+    PurgeRequest,
+    PurgeResponse,
 )
 
 logger = get_logger("api.faces")
@@ -47,6 +49,44 @@ def recent_faces(
     """Most recent captures (convenience endpoint for the dashboard)."""
     faces, _ = pipeline.repository.list_faces(limit=limit, offset=0)
     return [face_to_summary(f) for f in faces]
+
+
+@router.post("/faces/purge", response_model=PurgeResponse)
+def purge_faces(body: PurgeRequest, pipeline: Pipeline = Depends(get_pipeline)) -> PurgeResponse:
+    """Bulk-delete captured history by scope. Enrolled persons are kept."""
+    now = datetime.now(UTC)
+    windows = {
+        "all": (None, None),
+        "last_hour": (now - timedelta(hours=1), None),
+        "today": (now.replace(hour=0, minute=0, second=0, microsecond=0), None),
+        "older_than_week": (None, now - timedelta(days=7)),
+    }
+    if body.scope not in windows:
+        raise HTTPException(status_code=422, detail=f"Unknown scope '{body.scope}'")
+    since, until = windows[body.scope]
+
+    removed = pipeline.repository.purge_faces(since=since, until=until)
+
+    # Remove FAISS vectors: a full wipe resets the index; a partial purge
+    # removes the affected ids one by one.
+    if body.scope == "all":
+        pipeline.vector_store.reset()
+    else:
+        for item in removed:
+            pipeline.vector_store.remove(int(item["id"]))
+
+    for item in removed:
+        for key in ("image_path", "thumbnail_path", "embedding_path", "frame_path"):
+            path_str = item.get(key)
+            if path_str:
+                Path(str(path_str)).unlink(missing_ok=True)
+
+    logger.info("Purged %d faces (scope=%s)", len(removed), body.scope)
+    return PurgeResponse(
+        deleted=len(removed),
+        scope=body.scope,
+        message=f"Deleted {len(removed)} capture(s)",
+    )
 
 
 @router.get("/faces/{face_id}", response_model=FaceDetail)

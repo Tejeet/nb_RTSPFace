@@ -1,12 +1,49 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api.js";
 
+const PURGE_OPTIONS = [
+  { scope: "last_hour", label: "Clear last hour", confirm: "captures from the last hour" },
+  { scope: "today", label: "Clear today", confirm: "all captures from today" },
+  {
+    scope: "older_than_week",
+    label: "Clear older than 7 days",
+    confirm: "all captures older than 7 days",
+  },
+  { scope: "all", label: "Delete ALL history", confirm: "EVERY captured face", danger: true },
+];
+
 export default function SettingsPage() {
   const [info, setInfo] = useState(null);
   const [selected, setSelected] = useState(null);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
+  const [purgeBusy, setPurgeBusy] = useState(false);
+  const [purgeResult, setPurgeResult] = useState(null);
+
+  async function purge(option) {
+    const phrase = option.danger ? "DELETE ALL" : "delete";
+    if (
+      !window.confirm(
+        `This will permanently delete ${option.confirm} — images, embeddings and index ` +
+          `entries. Enrolled persons are kept. Continue?`,
+      )
+    )
+      return;
+    if (option.danger && window.prompt('Type "DELETE ALL" to confirm') !== phrase) {
+      return;
+    }
+    setPurgeBusy(true);
+    setPurgeResult(null);
+    try {
+      const res = await api.purgeFaces(option.scope);
+      setPurgeResult(res.message);
+    } catch (e) {
+      setPurgeResult(`Error: ${e.message}`);
+    } finally {
+      setPurgeBusy(false);
+    }
+  }
 
   useEffect(() => {
     api
@@ -178,6 +215,27 @@ export default function SettingsPage() {
             Either option safely runs on CPU until then.
           </p>
         )}
+      </section>
+
+      <section className="settings-card">
+        <h2 className="section-title">Data management</h2>
+        <p className="muted settings-note">
+          Permanently delete captured history — face images, thumbnails, full
+          frames, embeddings and index entries. Enrolled persons are kept.
+        </p>
+        <div className="purge-actions">
+          {PURGE_OPTIONS.map((opt) => (
+            <button
+              key={opt.scope}
+              className={`button${opt.danger ? " button-danger" : ""}`}
+              disabled={purgeBusy}
+              onClick={() => purge(opt)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {purgeResult && <p className="notice">{purgeResult}</p>}
       </section>
     </div>
   );

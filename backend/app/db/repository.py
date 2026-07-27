@@ -133,6 +133,49 @@ class FaceRepository:
             session.delete(person)
             return person
 
+    # -- Bulk purge ----------------------------------------------------------
+
+    def purge_faces(
+        self, since: datetime | None = None, until: datetime | None = None
+    ) -> list[dict[str, object]]:
+        """Delete captured faces in the given time window (both None = all).
+
+        Returns the file paths of every deleted face so the caller can remove
+        the images and FAISS vectors. Enrolled persons are untouched.
+        """
+        with self._db.session() as session:
+            query = select(Face)
+            if since is not None:
+                query = query.where(Face.captured_at >= since)
+            if until is not None:
+                query = query.where(Face.captured_at < until)
+            faces = list(session.scalars(query).all())
+            if not faces:
+                return []
+
+            face_ids = [f.id for f in faces]
+            removed = [
+                {
+                    "id": f.id,
+                    "image_path": f.image_path,
+                    "thumbnail_path": f.thumbnail_path,
+                    "embedding_path": f.embedding_path,
+                    "frame_path": f.frame_path,
+                }
+                for f in faces
+            ]
+
+            for link in session.scalars(
+                select(DuplicateLink).where(
+                    DuplicateLink.face_id.in_(face_ids)
+                    | DuplicateLink.matched_face_id.in_(face_ids)
+                )
+            ):
+                session.delete(link)
+            for face in faces:
+                session.delete(face)
+            return removed
+
     # -- Duplicates ----------------------------------------------------------
 
     def insert_duplicate_link(self, face_id: int, matched_face_id: int, similarity: float) -> None:

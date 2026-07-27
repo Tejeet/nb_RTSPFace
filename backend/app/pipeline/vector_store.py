@@ -67,6 +67,14 @@ class VectorStore:
             self._index.remove_ids(selector)
             self._dirty = True
 
+    def reset(self) -> None:
+        """Drop all vectors (used when purging the whole capture history)."""
+        with self._lock:
+            self._index = faiss.IndexIDMap(faiss.IndexFlatIP(self._dim))
+            self._dirty = True
+        self.save()
+        logger.info("FAISS index reset (all vectors cleared)")
+
     def search(self, embedding: np.ndarray, top_k: int = 10) -> list[tuple[int, float]]:
         """Return [(face_id, cosine_similarity)] for the top_k nearest vectors."""
         vector = np.asarray(embedding, dtype=np.float32).reshape(1, -1)

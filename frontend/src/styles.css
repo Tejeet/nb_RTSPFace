@@ -204,6 +204,7 @@ button { font: inherit; cursor: pointer; }
 }
 .button-primary:disabled { opacity: 0.5; }
 .notice { color: var(--accent); font-size: 13.5px; }
+.purge-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
 .enroll-list { display: flex; flex-direction: column; gap: 10px; }
 .person-row {

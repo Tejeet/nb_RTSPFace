@@ -32,6 +32,12 @@ export const api = {
     return request("/api/persons", { method: "POST", body: form });
   },
   deletePerson: (id) => request(`/api/persons/${id}`, { method: "DELETE" }),
+  purgeFaces: (scope) =>
+    request("/api/faces/purge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope }),
+    }),
   getInferenceSettings: () => request("/api/settings/inference"),
   setInferenceSettings: (backend) =>
     request("/api/settings/inference", {
