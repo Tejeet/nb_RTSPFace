@@ -21,7 +21,10 @@ cd "$(dirname "$0")/.."
 
 VERSION="${1:-v2.13.0}"
 BASE="https://hailo-model-zoo.s3.eu-west-2.amazonaws.com/ModelZoo/Compiled/${VERSION}/hailo8"
-DEST="models/models/hailo"
+# Host ./models is bind-mounted to /app/storage/models, and the app looks for
+# HEFs at /app/storage/models/hailo — so they go directly under models/hailo
+# (NOT models/models/hailo; that extra level is an InsightFace artifact).
+DEST="models/hailo"
 mkdir -p "$DEST"
 
 # Detection is the model that matters; recognition is optional (CPU by default).

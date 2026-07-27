@@ -63,17 +63,24 @@ class HailoFaceModels:
 
     @staticmethod
     def _load_cpu_recognizer(models_dir: Path, model_pack: str):
-        """Load only the ArcFace recogniser from the InsightFace pack."""
-        from insightface.app import FaceAnalysis
+        """Load only the ArcFace recogniser from the InsightFace pack.
 
-        analysis = FaceAnalysis(
-            name=model_pack,
-            root=str(models_dir),
-            allowed_modules=["recognition"],
-            providers=["CPUExecutionProvider"],
-        )
-        analysis.prepare(ctx_id=-1)
-        return analysis.models["recognition"]
+        FaceAnalysis asserts a detection model is present, but detection runs on
+        the Hailo here — so we load the recognition ONNX directly from the pack
+        (buffalo_l → w600k_r50.onnx; other packs → the model whose task is
+        'recognition').
+        """
+        from insightface.model_zoo import get_model
+
+        pack_dir = models_dir / "models" / model_pack
+        candidates = sorted(pack_dir.glob("w600k*.onnx")) or sorted(pack_dir.glob("*.onnx"))
+        for onnx_path in candidates:
+            model = get_model(str(onnx_path), providers=["CPUExecutionProvider"])
+            if getattr(model, "taskname", None) == "recognition":
+                model.prepare(ctx_id=-1)
+                logger.info("ArcFace recognizer loaded: %s", onnx_path.name)
+                return model
+        raise RuntimeError(f"No recognition model found in {pack_dir}")
 
     # -- Detection ---------------------------------------------------------
 
