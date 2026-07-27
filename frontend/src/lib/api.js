@@ -10,6 +10,16 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  listCameras: () => request("/api/cameras"),
+  addCamera: (name, rtspUrl) =>
+    request("/api/cameras", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, rtsp_url: rtspUrl }),
+    }),
+  deleteCamera: (id) => request(`/api/cameras/${id}`, { method: "DELETE" }),
+  liveStatus: (cameraId) =>
+    request(`/api/live-status${cameraId != null ? `?camera_id=${cameraId}` : ""}`),
   recentFaces: (limit = 24) => request(`/api/recent?limit=${limit}`),
   listFaces: (limit = 50, offset = 0) =>
     request(`/api/faces?limit=${limit}&offset=${offset}`),
@@ -17,7 +27,6 @@ export const api = {
   deleteFace: (id) => request(`/api/faces/${id}`, { method: "DELETE" }),
   statistics: () => request("/api/statistics"),
   health: () => request("/api/health"),
-  liveStatus: () => request("/api/live-status"),
   search: (file, topK = 10) => {
     const form = new FormData();
     form.append("file", file);

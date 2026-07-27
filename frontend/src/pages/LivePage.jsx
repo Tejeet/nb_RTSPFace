@@ -1,22 +1,50 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api.js";
-import { useEvent, useEventState } from "../lib/useEvents.js";
+import { useEvent } from "../lib/useEvents.js";
 import FaceCard from "../components/FaceCard.jsx";
 import ZoneEditor from "../components/ZoneEditor.jsx";
 
 export default function LivePage() {
-  const status = useEventState("live_status");
+  const [cameras, setCameras] = useState([]);
+  const [activeId, setActiveId] = useState(null);
+  const [status, setStatus] = useState(null);
   const [recent, setRecent] = useState([]);
   const imgRef = useRef(null);
   const containerRef = useRef(null);
 
+  // Load cameras once; default to the first.
   useEffect(() => {
+    api.listCameras().then((r) => {
+      setCameras(r.items);
+      if (r.items.length) setActiveId((cur) => cur ?? r.items[0].id);
+    });
     api.recentFaces(8).then(setRecent).catch(() => {});
   }, []);
 
+  // Poll live status for the selected camera (the WS event only covers one).
+  useEffect(() => {
+    if (activeId == null) return;
+    let alive = true;
+    const tick = () =>
+      api
+        .liveStatus(activeId)
+        .then((s) => alive && setStatus(s))
+        .catch(() => {});
+    tick();
+    const t = setInterval(tick, 1500);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [activeId]);
+
   useEvent("face_captured", (face) => {
-    setRecent((current) => [face, ...current].slice(0, 8));
+    if (activeId == null || face.camera_id === activeId) {
+      setRecent((current) => [face, ...current].slice(0, 8));
+    }
   });
+
+  const multi = cameras.length > 1;
 
   return (
     <div>
@@ -38,13 +66,33 @@ export default function LivePage() {
         </div>
       </header>
 
+      {multi && (
+        <div className="camera-tabs">
+          {cameras.map((c) => (
+            <button
+              key={c.id}
+              className={`camera-tab${c.id === activeId ? " active" : ""}`}
+              onClick={() => setActiveId(c.id)}
+            >
+              <span className={`dot ${c.connected ? "dot-ok" : "dot-bad"}`} />
+              {c.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="live-frame" ref={containerRef}>
         {status?.camera_connected === false ? (
-          <div className="live-offline">
-            Camera offline — reconnecting automatically…
-          </div>
+          <div className="live-offline">Camera offline — reconnecting automatically…</div>
         ) : (
-          <img ref={imgRef} src="/api/stream/live" alt="Live camera stream" />
+          activeId != null && (
+            <img
+              key={activeId}
+              ref={imgRef}
+              src={`/api/stream/live?camera_id=${activeId}`}
+              alt="Live camera stream"
+            />
+          )
         )}
         <ZoneEditor imgRef={imgRef} containerRef={containerRef} />
       </div>

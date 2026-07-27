@@ -7,11 +7,13 @@ import SearchPage from "./pages/SearchPage.jsx";
 import StatsPage from "./pages/StatsPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import EnrollPage from "./pages/EnrollPage.jsx";
+import CamerasPage from "./pages/CamerasPage.jsx";
 
 const NAV = [
   { to: "/", label: "Live View", icon: "📹" },
   { to: "/recent", label: "Recent Captures", icon: "🧑" },
   { to: "/enroll", label: "Enroll", icon: "🪪" },
+  { to: "/cameras", label: "Cameras", icon: "🎥" },
   { to: "/search", label: "Search", icon: "🔍" },
   { to: "/stats", label: "Statistics", icon: "📊" },
   { to: "/settings", label: "Settings", icon: "⚙️" },
@@ -54,6 +56,7 @@ export default function App() {
           <Route path="/" element={<LivePage />} />
           <Route path="/recent" element={<RecentPage />} />
           <Route path="/enroll" element={<EnrollPage />} />
+          <Route path="/cameras" element={<CamerasPage />} />
           <Route path="/faces/:id" element={<FaceDetailPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/stats" element={<StatsPage />} />

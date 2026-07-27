@@ -22,6 +22,8 @@ def get_health(pipeline: Pipeline = Depends(get_pipeline)) -> HealthStatus:
 
 
 @router.get("/live-status", response_model=LiveStatus)
-def get_live_status(pipeline: Pipeline = Depends(get_pipeline)) -> LiveStatus:
-    """Realtime camera / tracking status for the live view."""
-    return LiveStatus(**pipeline.live_status())
+def get_live_status(
+    camera_id: int | None = None, pipeline: Pipeline = Depends(get_pipeline)
+) -> LiveStatus:
+    """Realtime status for one camera (first camera when id omitted)."""
+    return LiveStatus(**pipeline.live_status(camera_id))

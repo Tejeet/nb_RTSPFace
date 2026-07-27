@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import __version__
 from app.api import (
+    cameras,
     faces,
     persons,
     search,
@@ -65,6 +66,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(faces.router)
     app.include_router(persons.router)
+    app.include_router(cameras.router)
     app.include_router(search.router)
     app.include_router(system.router)
     app.include_router(stream.router)

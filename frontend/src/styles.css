@@ -66,6 +66,16 @@ button { font: inherit; cursor: pointer; }
 
 /* ---- Live view --------------------------------------------------------- */
 .live-meta { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13.5px; }
+
+/* ---- Camera switcher & list ---------------------------------------- */
+.camera-tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.camera-tab {
+  display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--muted); font-size: 13.5px;
+}
+.camera-tab.active { border-color: var(--accent); color: var(--text); background: var(--surface-2); }
+.camera-url { word-break: break-all; font-size: 12px; }
 .live-frame {
   background: #000; border: 1px solid var(--border); border-radius: var(--radius);
   overflow: hidden; aspect-ratio: 16 / 9; display: flex;

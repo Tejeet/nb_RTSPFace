@@ -82,8 +82,9 @@ class SearchResponse(BaseModel):
 class LiveStatus(BaseModel):
     """Realtime pipeline status for the live view overlay."""
 
-    camera_connected: bool
+    camera_id: int = 0
     camera_name: str
+    camera_connected: bool
     fps: float
     faces_in_frame: int = 0
     visible_faces: int
@@ -108,6 +109,7 @@ class SystemStats(BaseModel):
     faces_last_hour: int
     faces_in_frame: int = 0
     current_tracks: int
+    camera_count: int = 1
     fps: float
     detection_latency_ms: float
     embedding_latency_ms: float
@@ -164,6 +166,32 @@ class InferenceUpdate(BaseModel):
     """Settings page payload."""
 
     inference_backend: str
+
+
+class CameraCreate(BaseModel):
+    """Payload to add a camera."""
+
+    name: str
+    rtsp_url: str
+
+
+class CameraSummary(BaseModel):
+    """A configured camera and its live state."""
+
+    id: int
+    name: str
+    rtsp_url: str
+    created_at: datetime
+    running: bool
+    connected: bool
+    stream_url: str
+
+
+class CameraListResponse(BaseModel):
+    """All configured cameras."""
+
+    items: list[CameraSummary]
+    total: int
 
 
 class PersonSummary(BaseModel):

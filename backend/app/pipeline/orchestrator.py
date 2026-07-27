@@ -13,18 +13,16 @@ from app.config import Settings
 from app.db.repository import FaceRepository
 from app.db.session import DatabaseManager
 from app.logging_setup import get_logger
-from app.pipeline.camera import CameraReader, FramePacket
+from app.pipeline.camera_pipeline import CameraPipeline
 from app.pipeline.cropper import FaceCropper
 from app.pipeline.detector import FaceModels, npu_runtime_available, resolve_providers
 from app.pipeline.enrollment import PersonManager
 from app.pipeline.events import EventBus
 from app.pipeline.health import HealthMonitor
-from app.pipeline.live import LiveFrameBuffer
 from app.pipeline.quality import QualityEvaluator
 from app.pipeline.stats import StatsCollector
-from app.pipeline.tracker import ByteTracker
 from app.pipeline.vector_store import VectorStore
-from app.pipeline.workers import CaptureJob, DetectionWorker, EmbeddingWorker, PersistJob, StorageWorker
+from app.pipeline.workers import CaptureJob, EmbeddingWorker, PersistJob, StorageWorker
 from app.pipeline.zone import CaptureZone
 from app.runtime_settings import RuntimeSettings
 
@@ -42,10 +40,13 @@ class Pipeline:
         self.db = DatabaseManager(settings.sqlite_path)
         self.db.create_schema()
         self.repository = FaceRepository(self.db)
-        self.camera_id = self.repository.upsert_camera(settings.camera_name, settings.rtsp_url)
+        # First run: seed the camera table from the RTSP_URL env so existing
+        # single-camera setups keep working; afterwards cameras are managed
+        # from the dashboard and this seed is skipped.
+        if self.repository.count_cameras() == 0:
+            self.repository.upsert_camera(settings.camera_name, settings.rtsp_url)
 
         self.event_bus = EventBus()
-        self.stats = StatsCollector()
 
         # Inference backend: dashboard-saved value overrides the env default.
         self.runtime_settings = RuntimeSettings(settings.database_dir / "settings.json")
@@ -73,21 +74,13 @@ class Pipeline:
             save_interval=settings.faiss_save_interval,
         )
 
-        # Queues (bounded)
-        self.frame_queue: queue.Queue[FramePacket] = queue.Queue(settings.frame_queue_size)
+        # Shared queues (bounded): every camera feeds these single back-end stages.
         self.embed_queue: queue.Queue[CaptureJob | None] = queue.Queue(settings.embed_queue_size)
         self.persist_queue: queue.Queue[PersistJob | None] = queue.Queue(
             settings.persist_queue_size
         )
 
-        # Stage components
-        self.tracker = ByteTracker(
-            match_iou=settings.track_match_iou,
-            min_hits=settings.track_min_hits,
-            max_lost_frames=settings.track_max_lost_frames,
-            low_score_threshold=settings.track_low_score_threshold,
-            high_score_threshold=settings.detection_confidence,
-        )
+        # Shared stage components
         self.quality = QualityEvaluator(
             min_score=settings.quality_min_score,
             blur_threshold=settings.quality_blur_threshold,
@@ -104,42 +97,35 @@ class Pipeline:
             jpeg_quality=settings.jpeg_quality,
         )
         # Zone precedence: dashboard-saved zone.json overrides the env default.
+        # Shared across cameras (per-camera zones are a future refinement).
         self.capture_zone = CaptureZone(self._load_zone_points())
         if self.capture_zone.enabled:
             logger.info("Capture zone active: %s", self.capture_zone.get_points())
 
-        self.live_buffer = LiveFrameBuffer(
-            target_width=settings.live_stream_width,
-            max_fps=settings.live_stream_fps,
-            zone=self.capture_zone,
-        )
+        # One CameraPipeline per configured camera, all feeding embed_queue.
+        self.camera_pipelines: dict[int, CameraPipeline] = {}
+        for cam in self.repository.list_cameras():
+            self.camera_pipelines[cam.id] = CameraPipeline(
+                camera_id=cam.id,
+                camera_name=cam.name,
+                rtsp_url=cam.rtsp_url,
+                settings=settings,
+                models=self.models,
+                cropper=self.cropper,
+                quality=self.quality,
+                embed_queue=self.embed_queue,
+                zone=self.capture_zone,
+            )
+        logger.info("Configured %d camera(s): %s",
+                    len(self.camera_pipelines),
+                    ", ".join(p.camera_name for p in self.camera_pipelines.values()))
 
-        # Workers
-        self.camera = CameraReader(
-            rtsp_url=settings.rtsp_url,
-            frame_queue=self.frame_queue,
-            reconnect_min_delay=settings.camera_reconnect_min_delay,
-            reconnect_max_delay=settings.camera_reconnect_max_delay,
-            rtsp_transport=settings.rtsp_transport,
-        )
-        self.detection_worker = DetectionWorker(
-            settings=settings,
-            frame_queue=self.frame_queue,
-            embed_queue=self.embed_queue,
-            models=self.models,
-            tracker=self.tracker,
-            quality=self.quality,
-            cropper=self.cropper,
-            live_buffer=self.live_buffer,
-            stats=self.stats,
-            camera_fps=lambda: self.camera.state.fps,
-            zone=self.capture_zone,
-        )
+        # Shared back-end workers
         self.embedding_worker = EmbeddingWorker(
             embed_queue=self.embed_queue,
             persist_queue=self.persist_queue,
             models=self.models,
-            stats=self.stats,
+            stats=self._first_stats(),
         )
         self.storage_worker = StorageWorker(
             settings=settings,
@@ -149,8 +135,7 @@ class Pipeline:
             vector_store=self.vector_store,
             person_manager=self.person_manager,
             event_bus=self.event_bus,
-            stats=self.stats,
-            camera_id=self.camera_id,
+            stats=self._first_stats(),
         )
         self.health_monitor = HealthMonitor(
             pipeline=self,
@@ -158,15 +143,25 @@ class Pipeline:
             interval=settings.stats_interval,
         )
 
+    def _first_stats(self) -> StatsCollector:
+        """A stats collector for the shared back-end workers.
+
+        Embedding latency is global (one accelerator), so any camera's
+        collector works; fall back to a standalone one if no camera exists.
+        """
+        if self.camera_pipelines:
+            return next(iter(self.camera_pipelines.values())).stats
+        return StatsCollector()
+
     # -- lifecycle ---------------------------------------------------------
 
     def start(self) -> None:
-        """Start all worker threads."""
-        logger.info("Starting pipeline (camera=%s)", self.settings.camera_name)
-        self.camera.start()
-        self.detection_worker.start()
+        """Start all camera pipelines and the shared back-end workers."""
+        logger.info("Starting pipeline (%d camera(s))", len(self.camera_pipelines))
         self.embedding_worker.start()
         self.storage_worker.start()
+        for pipe in self.camera_pipelines.values():
+            pipe.start()
         self.health_monitor.start()
         logger.info("Pipeline running")
 
@@ -174,14 +169,14 @@ class Pipeline:
         """Stop workers in dependency order and flush state to disk."""
         logger.info("Stopping pipeline")
         self.health_monitor.stop()
-        self.camera.stop()
-        self.detection_worker.stop()
-        self.detection_worker.join(timeout=5)
+        for pipe in self.camera_pipelines.values():
+            pipe.stop()
+        for pipe in self.camera_pipelines.values():
+            pipe.join(timeout=5)
         self.embedding_worker.stop()
         self.embedding_worker.join(timeout=10)
         self.storage_worker.stop()
         self.storage_worker.join(timeout=10)
-        self.camera.join(timeout=5)
         self.vector_store.save()
         self.person_manager.save()
         if hasattr(self.models, "close"):
@@ -335,27 +330,33 @@ class Pipeline:
     # -- read views for the API -----------------------------------------------
 
     def queue_sizes(self) -> dict[str, int]:
-        """Current depth of each inter-stage queue."""
+        """Current depth of each inter-stage queue (frames summed per camera)."""
         return {
-            "frames": self.frame_queue.qsize(),
+            "frames": sum(p._frame_queue.qsize() for p in self.camera_pipelines.values()),
             "embeddings": self.embed_queue.qsize(),
             "persistence": self.persist_queue.qsize(),
         }
 
-    def live_status(self) -> dict[str, object]:
-        """Realtime status for the live view page."""
-        camera = self.camera.state.snapshot()
-        pipeline = self.stats.snapshot()
-        return {
-            "camera_connected": camera["connected"],
-            "camera_name": self.settings.camera_name,
-            "fps": camera["fps"],
-            "faces_in_frame": pipeline["faces_in_frame"],
-            "visible_faces": pipeline["visible_faces"],
-            "tracked_faces": pipeline["tracked_faces"],
-            "frame_width": camera["frame_width"],
-            "frame_height": camera["frame_height"],
-        }
+    def get_camera_pipeline(self, camera_id: int | None) -> CameraPipeline | None:
+        """A specific camera pipeline, or the first one when id is omitted."""
+        if camera_id is not None:
+            return self.camera_pipelines.get(camera_id)
+        return next(iter(self.camera_pipelines.values()), None)
+
+    def camera_statuses(self) -> list[dict[str, object]]:
+        """Per-camera realtime status (one entry per configured camera)."""
+        return [p.live_status() for p in self.camera_pipelines.values()]
+
+    def live_status(self, camera_id: int | None = None) -> dict[str, object]:
+        """Realtime status for one camera (first camera by default)."""
+        pipe = self.get_camera_pipeline(camera_id)
+        if pipe is None:
+            return {
+                "camera_id": 0, "camera_name": "—", "camera_connected": False,
+                "fps": 0.0, "faces_in_frame": 0, "visible_faces": 0,
+                "tracked_faces": 0, "frame_width": 0, "frame_height": 0,
+            }
+        return pipe.live_status()
 
     def running_backend(self) -> str:
         """Which inference backend actually loaded: 'cpu' | 'npu' | 'hailo'."""
@@ -374,24 +375,33 @@ class Pipeline:
         }[self.running_backend()]
 
     def statistics(self) -> dict[str, object]:
-        """Aggregate stats for the dashboard and WebSocket broadcast."""
-        pipeline = self.stats.snapshot()
+        """Aggregate stats across all cameras for the dashboard broadcast."""
         system = self.health_monitor.system_metrics()
         counts = self.repository.counts_summary()
-        camera = self.camera.state.snapshot()
+        snaps = [p.stats.snapshot() for p in self.camera_pipelines.values()]
+        cams = [p.camera.state.snapshot() for p in self.camera_pipelines.values()]
+
+        def _sum(key: str) -> float:
+            return round(sum(s[key] for s in snaps), 2) if snaps else 0.0
+
+        def _max(values) -> float:  # noqa: ANN001
+            return round(max(values), 2) if values else 0.0
+
         return {
             "faces_total": counts["total"],
             "faces_today": counts["today"],
             "faces_last_hour": counts["last_hour"],
-            "faces_in_frame": pipeline["faces_in_frame"],
-            "current_tracks": pipeline["tracked_faces"],
-            "fps": camera["fps"],
-            "processing_fps": pipeline["processing_fps"],
-            "detection_latency_ms": pipeline["detection_latency_ms"],
-            "embedding_latency_ms": pipeline["embedding_latency_ms"],
-            "faces_saved_session": pipeline["faces_saved_session"],
-            "faces_rejected_session": pipeline["faces_rejected_session"],
-            "uptime_seconds": pipeline["uptime_seconds"],
+            "faces_in_frame": int(_sum("faces_in_frame")),
+            "current_tracks": int(_sum("tracked_faces")),
+            "fps": _max([c["fps"] for c in cams]),
+            "processing_fps": _sum("processing_fps"),
+            "detection_latency_ms": _max([s["detection_latency_ms"] for s in snaps]),
+            "embedding_latency_ms": _max([s["embedding_latency_ms"] for s in snaps]),
+            "faces_saved_session": int(_sum("faces_saved_session")),
+            "faces_rejected_session": int(_sum("faces_rejected_session")),
+            "uptime_seconds": max((s["uptime_seconds"] for s in snaps), default=0.0),
+            "camera_count": len(self.camera_pipelines),
+            "cameras": self.camera_statuses(),
             "inference_backend": self.running_backend(),
             "inference_label": self.backend_label(),
             "queues": self.queue_sizes(),
@@ -406,13 +416,16 @@ class Pipeline:
         except Exception:
             database_ok = False
 
-        camera = self.camera.state.snapshot()
+        cams = [p.camera.state.snapshot() for p in self.camera_pipelines.values()]
+        # Healthy when the DB is fine and at least one camera is connected.
+        any_connected = any(c["connected"] for c in cams)
+        max_fps = round(max((c["fps"] for c in cams), default=0.0), 2)
         system = self.health_monitor.system_metrics()
-        healthy = database_ok and bool(camera["connected"])
+        healthy = database_ok and any_connected
         return {
             "status": "healthy" if healthy else "degraded",
-            "camera_connected": camera["connected"],
-            "fps": camera["fps"],
+            "camera_connected": any_connected,
+            "fps": max_fps,
             "database_ok": database_ok,
             "faiss_ok": True,
             "faiss_vectors": self.vector_store.count,
@@ -422,5 +435,8 @@ class Pipeline:
             "ram_percent": system["ram_percent"],
             "disk_percent": system["disk_percent"],
             "temperature_c": system["temperature_c"],
-            "uptime_seconds": self.stats.snapshot()["uptime_seconds"],
+            "uptime_seconds": max(
+                (p.stats.snapshot()["uptime_seconds"] for p in self.camera_pipelines.values()),
+                default=0.0,
+            ),
         }

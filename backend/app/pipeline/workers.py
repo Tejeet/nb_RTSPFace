@@ -41,6 +41,7 @@ _SENTINEL = None
 class CaptureJob:
     """A quality-approved face crop awaiting embedding."""
 
+    camera_id: int  # which camera this capture came from
     face_crop: np.ndarray  # padded square crop (for saving)
     aligned: np.ndarray  # 112x112 aligned crop (for embedding)
     bbox: tuple[int, int, int, int]
@@ -75,8 +76,10 @@ class DetectionWorker(threading.Thread):
         stats: StatsCollector,
         camera_fps: "callable",
         zone: CaptureZone,
+        camera_id: int,
+        camera_name: str,
     ) -> None:
-        super().__init__(name="detection-worker", daemon=True)
+        super().__init__(name=f"detection-worker-{camera_id}", daemon=True)
         self._settings = settings
         self._frame_queue = frame_queue
         self._embed_queue = embed_queue
@@ -88,6 +91,8 @@ class DetectionWorker(threading.Thread):
         self._stats = stats
         self._camera_fps = camera_fps
         self._zone = zone
+        self._camera_id = camera_id
+        self._camera_name = camera_name
         self._stop_event = threading.Event()
 
     def stop(self) -> None:
@@ -164,6 +169,7 @@ class DetectionWorker(threading.Thread):
                 )
                 frame_jpeg = encoded.tobytes() if ok else None
             job = CaptureJob(
+                camera_id=self._camera_id,
                 face_crop=face_crop.copy(),
                 aligned=self._models.align(packet.frame, track.kps),
                 bbox=track.bbox,
@@ -185,7 +191,7 @@ class DetectionWorker(threading.Thread):
                                track.track_id)
 
         self._live.update(
-            packet.frame, tracks, self._camera_fps(), self._settings.camera_name,
+            packet.frame, tracks, self._camera_fps(), self._camera_name,
             faces_in_frame=len(detections),
         )
 
@@ -239,7 +245,6 @@ class StorageWorker(threading.Thread):
         person_manager,  # PersonManager; untyped for the same reason
         event_bus: EventBus,
         stats: StatsCollector,
-        camera_id: int,
     ) -> None:
         super().__init__(name="storage-worker", daemon=True)
         self._settings = settings
@@ -250,7 +255,6 @@ class StorageWorker(threading.Thread):
         self._persons = person_manager
         self._events = event_bus
         self._stats = stats
-        self._camera_id = camera_id
 
     def stop(self) -> None:
         self._persist_queue.put(_SENTINEL)
@@ -298,7 +302,7 @@ class StorageWorker(threading.Thread):
         face = self._repo.insert_face(
             Face(
                 uuid=saved.face_uuid,
-                camera_id=self._camera_id,
+                camera_id=capture.camera_id,
                 track_id=capture.track_id,
                 captured_at=capture.captured_at,
                 image_path=str(saved.image_path),
@@ -343,7 +347,7 @@ class StorageWorker(threading.Thread):
                 "person_id": face.person_id,
                 "person_name": face.person_name,
                 "recognition_similarity": face.recognition_similarity,
-                "camera_id": self._camera_id,
+                "camera_id": capture.camera_id,
                 "thumbnail_url": f"/api/faces/{face.id}/thumbnail",
                 "image_url": f"/api/faces/{face.id}/image",
             },

@@ -32,6 +32,41 @@ class FaceRepository:
                 camera.rtsp_url = rtsp_url
             return camera.id
 
+    def add_camera(self, name: str, rtsp_url: str) -> Camera:
+        """Create a new camera; raises ValueError if the name is taken."""
+        with self._db.session() as session:
+            if session.scalar(select(Camera).where(Camera.name == name)) is not None:
+                raise ValueError(f"A camera named '{name}' already exists")
+            camera = Camera(name=name, rtsp_url=rtsp_url)
+            session.add(camera)
+            session.flush()
+            session.refresh(camera)
+            return camera
+
+    def list_cameras(self) -> list[Camera]:
+        """All configured cameras, oldest first (stable ordering)."""
+        with self._db.session() as session:
+            return list(session.scalars(select(Camera).order_by(Camera.id)).all())
+
+    def get_camera(self, camera_id: int) -> Camera | None:
+        """Fetch one camera by id."""
+        with self._db.session() as session:
+            return session.get(Camera, camera_id)
+
+    def delete_camera(self, camera_id: int) -> Camera | None:
+        """Delete a camera row (its captured faces are kept)."""
+        with self._db.session() as session:
+            camera = session.get(Camera, camera_id)
+            if camera is None:
+                return None
+            session.delete(camera)
+            return camera
+
+    def count_cameras(self) -> int:
+        """Number of configured cameras."""
+        with self._db.session() as session:
+            return session.scalar(select(func.count(Camera.id))) or 0
+
     # -- Faces ---------------------------------------------------------------
 
     def insert_face(self, face: Face) -> Face:
