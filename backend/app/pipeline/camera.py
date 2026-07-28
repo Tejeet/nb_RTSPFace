@@ -67,6 +67,8 @@ class CameraReader(threading.Thread):
         reconnect_min_delay: float,
         reconnect_max_delay: float,
         rtsp_transport: str = "tcp",
+        low_latency: bool = True,
+        max_delay_ms: int = 200,
     ) -> None:
         super().__init__(name="camera-reader", daemon=True)
         self._rtsp_url = rtsp_url
@@ -74,6 +76,8 @@ class CameraReader(threading.Thread):
         self._min_delay = reconnect_min_delay
         self._max_delay = reconnect_max_delay
         self._rtsp_transport = rtsp_transport
+        self._low_latency = low_latency
+        self._max_delay_ms = max_delay_ms
         self._stop_event = threading.Event()
         self.state = CameraState()
 
@@ -92,9 +96,13 @@ class CameraReader(threading.Thread):
             # OpenCV's FFmpeg backend only accepts demuxer options via this env
             # var, read at VideoCapture creation. RTP-over-TCP is essential in
             # Docker bridge networks where UDP return traffic is unroutable.
-            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = (
-                f"rtsp_transport;{self._rtsp_transport}|max_delay;500000"
-            )
+            opts = [f"rtsp_transport;{self._rtsp_transport}",
+                    f"max_delay;{self._max_delay_ms * 1000}"]
+            if self._low_latency:
+                # Don't buffer input or reorder frames — keep the live view
+                # tracking real time instead of lagging behind.
+                opts += ["fflags;nobuffer", "flags;low_delay", "reorder_queue_size;0"]
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "|".join(opts)
             capture = cv2.VideoCapture(source, cv2.CAP_FFMPEG)
         else:
             # USB / CSI-via-V4L2 device: "usb:0", "/dev/video0", or a bare index.

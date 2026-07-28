@@ -58,6 +58,8 @@ class CameraPipeline:
             reconnect_min_delay=settings.camera_reconnect_min_delay,
             reconnect_max_delay=settings.camera_reconnect_max_delay,
             rtsp_transport=settings.rtsp_transport,
+            low_latency=settings.rtsp_low_latency,
+            max_delay_ms=settings.rtsp_max_delay_ms,
         )
         self.detection_worker = DetectionWorker(
             settings=settings,

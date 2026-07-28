@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     # TCP is required in Docker bridge networks: UDP/RTP return traffic cannot
     # reach the container, which makes streams that play fine in VLC fail here.
     rtsp_transport: str = Field(default="tcp", alias="RTSP_TRANSPORT")
+    # Low-latency RTSP: disable FFmpeg input buffering and frame reordering so
+    # the live view tracks real time instead of lagging ~0.5s behind.
+    rtsp_low_latency: bool = Field(default=True, alias="RTSP_LOW_LATENCY")
+    rtsp_max_delay_ms: int = Field(default=200, ge=0, alias="RTSP_MAX_DELAY_MS")
     camera_name: str = Field(default="camera-1", alias="CAMERA_NAME")
     camera_reconnect_min_delay: float = Field(default=1.0, alias="CAMERA_RECONNECT_MIN_DELAY")
     camera_reconnect_max_delay: float = Field(default=30.0, alias="CAMERA_RECONNECT_MAX_DELAY")
@@ -88,7 +92,9 @@ class Settings(BaseSettings):
     storage_root: Path = Field(default=Path("/app/storage"), alias="STORAGE_ROOT")
 
     # -- Queues -------------------------------------------------------------
-    frame_queue_size: int = Field(default=4, ge=1, alias="FRAME_QUEUE_SIZE")
+    # 1 = lowest live-view latency (always process the freshest frame, drop the
+    # rest); raise slightly only if the stream is very jittery.
+    frame_queue_size: int = Field(default=1, ge=1, alias="FRAME_QUEUE_SIZE")
     embed_queue_size: int = Field(default=32, ge=1, alias="EMBED_QUEUE_SIZE")
     persist_queue_size: int = Field(default=64, ge=1, alias="PERSIST_QUEUE_SIZE")
 
